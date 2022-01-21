@@ -18,4 +18,7 @@ MODEL:
 DATASET:
     DIR: 'D:\Code\Datasets\Detection\Steel_NEU\COCO'
     TRAIN_JSON: 'train.json'
-    IMG_SIZE: [224,224]
+    VAL_JSON: 'val.json'
+    TEST_JSON: 'test.json'
+    TRAIN_SIZE: [224,224]
+    TEST_SIZE: [224,224]

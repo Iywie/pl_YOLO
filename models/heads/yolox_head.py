@@ -115,7 +115,7 @@ class YOLOXHead(nn.Module):
         for k, (cls_conv, reg_conv, stride_this_level, x) in enumerate(
                 zip(self.cls_convs, self.reg_convs, self.strides, inputs)
         ):
-            # Change all inputs to the same channel. (the smallest one like 256)
+            # Change all inputs to the same channel. (like 256)
             x = self.stems[k](x)
 
             cls_feat = cls_conv(x)
@@ -123,18 +123,6 @@ class YOLOXHead(nn.Module):
             reg_feat = reg_conv(x)
             reg_output = self.reg_preds[k](reg_feat)
             obj_output = self.obj_preds[k](reg_feat)
-
-
-
-
-
-
-
-
-
-
-
-
 
             if self.training:
                 output = torch.cat([reg_output, obj_output, cls_output], 1)
@@ -366,23 +354,23 @@ class YOLOXHead(nn.Module):
 
         num_fg = max(num_fg, 1)
         loss_iou = (
-                       self.iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)
-                   ).sum() / num_fg
+            self.iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)
+        ).sum() / num_fg
 
         loss_obj = (
-                       self.bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)
-                   ).sum() / num_fg
+           self.bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)
+        ).sum() / num_fg
 
         loss_cls = (
-                       self.bcewithlog_loss(
-                           cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets
-                       )
-                   ).sum() / num_fg
+            self.bcewithlog_loss(
+               cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets
+               )
+        ).sum() / num_fg
 
         if self.use_l1:
             loss_l1 = (
-                          self.l1_loss(origin_preds.view(-1, 4)[fg_masks], l1_targets)
-                      ).sum() / num_fg
+                self.l1_loss(origin_preds.view(-1, 4)[fg_masks], l1_targets)
+            ).sum() / num_fg
         else:
             loss_l1 = 0.0
 

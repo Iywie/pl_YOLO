@@ -3,7 +3,7 @@ import models.backbones as backbone
 import models.necks as neck
 import models.heads as head
 from torch.optim import Adam
-from data import TrainTransform
+from data import TrainTransform, ValTransform
 
 
 class LitYOLOX(LightningModule):
@@ -54,6 +54,8 @@ class LitYOLOX(LightningModule):
         }
         return loss
 
+    def validation_step(self, *args, **kwargs):
+
     def configure_optimizers(self):
         optimizer = Adam(self.parameters(), lr=0.03)
         return optimizer
@@ -63,7 +65,7 @@ class LitYOLOX(LightningModule):
         from torch.utils.data.dataloader import DataLoader
         data_dir = self.dataset_cfgs['DIR']
         json = self.dataset_cfgs['TRAIN_JSON']
-        img_size = tuple(self.dataset_cfgs['IMG_SIZE'])
+        img_size = tuple(self.dataset_cfgs['TRAIN_SIZE'])
         dataset = COCODataset(
             data_dir,
             json,
@@ -77,3 +79,29 @@ class LitYOLOX(LightningModule):
         )
         train_loader = DataLoader(dataset, batch_size=16, num_workers=4, shuffle=False)
         return train_loader
+
+    def val_dataloader(self):
+        from data.datasets.coco import COCODataset
+        from torch.utils.data.dataloader import DataLoader
+        data_dir = self.dataset_cfgs['DIR']
+        json = self.dataset_cfgs['VAL_JSON']
+        img_size = tuple(self.dataset_cfgs['TRAIN_SIZE'])
+        dataset = COCODataset(
+            data_dir,
+            json,
+            name="val",
+            img_size=img_size,
+            preprocess=ValTransform(legacy=False),
+        )
+        val_loader = DataLoader(dataset, batch_size=16, num_workers=4, shuffle=False)
+        evaluator = COCOEvaluator(
+            dataloader=val_loader,
+            img_size=img_size,
+            confthre=self.test_conf,
+            nmsthre=self.nmsthre,
+            num_classes=self.num_classes,
+            testdev=testdev,
+        )
+
+
+

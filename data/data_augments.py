@@ -56,6 +56,36 @@ class TrainTransform:
         return image_t, padded_labels
 
 
+class ValTransform:
+    """
+    Defines the transformations that should be applied to test PIL image
+    for input into the network
+
+    dimension -> tensorize -> color adj
+
+    Arguments:
+        swap ((int,int,int)): final order of channels
+
+    Returns:
+        transform (transform) : callable transform to be applied to test/val
+        data
+    """
+
+    def __init__(self, swap=(2, 0, 1), legacy=False):
+        self.swap = swap
+        self.legacy = legacy
+
+    # assume input is cv2 img for now
+    def __call__(self, img, res, input_size):
+        img, _ = preproc(img, input_size, self.swap)
+        if self.legacy:
+            img = img[::-1, :, :].copy()
+            img /= 255.0
+            img -= np.array([0.485, 0.456, 0.406]).reshape(3, 1, 1)
+            img /= np.array([0.229, 0.224, 0.225]).reshape(3, 1, 1)
+        return img, np.zeros((1, 5))
+
+
 def preproc(img, input_size, swap=(2, 0, 1)):
     if len(img.shape) == 3:
         padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
