@@ -124,6 +124,18 @@ class YOLOXHead(nn.Module):
             reg_output = self.reg_preds[k](reg_feat)
             obj_output = self.obj_preds[k](reg_feat)
 
+
+
+
+
+
+
+
+
+
+
+
+
             if self.training:
                 output = torch.cat([reg_output, obj_output, cls_output], 1)
                 # 添加预测框的grid相对位置信息

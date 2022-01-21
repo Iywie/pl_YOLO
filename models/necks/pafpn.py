@@ -18,22 +18,22 @@ class PAFPN(nn.Module):
     ):
         super().__init__()
         self.in_features = in_features
-        self.in_channels = in_channels
+        self.in_channels = self.in_features
 
-        self.shrink_conv1 = BaseConv(int(in_channels[2]), int(in_channels[1]), 1, 1, norm=norm, act=act)
-        self.shrink_conv2 = BaseConv(int(in_channels[1]), int(in_channels[0]), 1, 1, norm=norm, act=act)
+        self.shrink_conv1 = BaseConv(in_channels[2], in_channels[1], 1, 1, norm=norm, act=act)
+        self.shrink_conv2 = BaseConv(in_channels[1], in_channels[0], 1, 1, norm=norm, act=act)
         self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
         self.p5_p4 = CSPLayer(
-            int(2 * in_channels[1]),
-            int(in_channels[1]),
+            2 * in_channels[1],
+            in_channels[1],
             round(3 * depth),
             shortcut=False,
             norm=norm,
             act=act,
         )
         self.p4_p3 = CSPLayer(
-            int(2 * in_channels[0]),
-            int(in_channels[0]),
+            2 * in_channels[0],
+            in_channels[0],
             round(3 * depth),
             shortcut=False,
             norm=norm,
@@ -44,16 +44,16 @@ class PAFPN(nn.Module):
         self.downsample_conv1 = BaseConv(int(in_channels[0]), int(in_channels[0]), 3, 2, norm=norm, act=act)
         self.downsample_conv2 = BaseConv(int(in_channels[1]), int(in_channels[1]), 3, 2, norm=norm, act=act)
         self.n3_n4 = CSPLayer(
-            int(2 * in_channels[0]),
-            int(in_channels[1]),
+            2 * in_channels[0],
+            in_channels[1],
             round(3 * depth),
             shortcut=False,
             norm=norm,
             act=act,
         )
         self.n4_n5 = CSPLayer(
-            int(2 * in_channels[1]),
-            int(in_channels[2]),
+            2 * in_channels[1],
+            in_channels[2],
             round(3 * depth),
             shortcut=False,
             norm=norm,

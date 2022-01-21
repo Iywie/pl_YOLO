@@ -1,7 +1,7 @@
 from pytorch_lightning import LightningModule
-import models.backbones as BACKBONE
-import models.necks as NECK
-import models.heads as Head
+import models.backbones as backbone
+import models.necks as neck
+import models.heads as head
 from torch.optim import Adam
 from data import TrainTransform
 
@@ -16,22 +16,22 @@ class LitYOLOX(LightningModule):
         self.dataset_cfgs = cfgs['DATASET']
         # backbone parameters
         b_depth = self.backbone_cfgs['DEPTH']
-        b_width = self.backbone_cfgs['WIDTH']
         b_norm = self.backbone_cfgs['NORM']
         b_act = self.backbone_cfgs['ACT']
+        b_channels = self.backbone_cfgs['INPUT_CHANNELS']
         out_features = self.backbone_cfgs['OUT_FEATURES']
         # neck parameters
         n_depth = self.neck_cfgs['DEPTH']
+        n_channels = self.neck_cfgs['INPUT_CHANNELS']
         n_norm = self.neck_cfgs['NORM']
         n_act = self.neck_cfgs['ACT']
-        input_channel = (int(64*b_width*4), int(64*b_width*8), int(64*b_width*16))
         # head parameters
         num_classes = self.head_cfgs['CLASSES']
         stride = [8, 16, 32]
 
-        self.backbone = BACKBONE.CSPDarkNet(b_depth, b_width, out_features, b_norm, b_act)
-        self.neck = NECK.PAFPN(n_depth, out_features, input_channel, n_norm, n_act)
-        self.head = Head.YOLOXHead(num_classes, stride, input_channel, n_norm, n_act)
+        self.backbone = backbone.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
+        self.neck = neck.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
+        self.head = head.YOLOXHead(num_classes, stride, n_channels, n_norm, n_act)
 
     def forward(self, x):
         x = self.backbone(x)

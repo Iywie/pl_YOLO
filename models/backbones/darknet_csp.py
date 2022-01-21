@@ -9,7 +9,7 @@ class CSPDarkNet(nn.Module):
     def __init__(
         self,
         dep_mul=1.0,
-        wid_mul=1.0,
+        channels=(64, 128, 256, 512, 1024),
         out_features=("dark3", "dark4", "dark5"),
         norm='bn',
         act="silu",
@@ -17,20 +17,19 @@ class CSPDarkNet(nn.Module):
         super().__init__()
 
         # parameters of the network
-        base_channels = int(wid_mul * 64)  # 64
         base_depth = max(round(dep_mul * 3), 1)  # 3
         assert out_features, "please provide output features of Darknet!"
         self.out_features = out_features
 
         # stem
-        self.stem = Focus(3, base_channels, ksize=3, norm=norm, act=act)
+        self.stem = Focus(3, channels[0], ksize=3, norm=norm, act=act)
 
         # dark2
         self.dark2 = nn.Sequential(
-            BaseConv(base_channels, base_channels * 2, 3, 2, norm=norm, act=act),
+            BaseConv(channels[0], channels[1], 3, 2, norm=norm, act=act),
             CSPLayer(
-                base_channels * 2,
-                base_channels * 2,
+                channels[1],
+                channels[1],
                 num_bottle=base_depth,
                 norm=norm,
                 act=act,
@@ -39,10 +38,10 @@ class CSPDarkNet(nn.Module):
 
         # dark3
         self.dark3 = nn.Sequential(
-            BaseConv(base_channels * 2, base_channels * 4, 3, 2, norm=norm, act=act),
+            BaseConv(channels[1], channels[2], 3, 2, norm=norm, act=act),
             CSPLayer(
-                base_channels * 4,
-                base_channels * 4,
+                channels[2],
+                channels[2],
                 num_bottle=base_depth * 3,
                 norm=norm,
                 act=act,
@@ -51,10 +50,10 @@ class CSPDarkNet(nn.Module):
 
         # dark4
         self.dark4 = nn.Sequential(
-            BaseConv(base_channels * 4, base_channels * 8, 3, 2, norm=norm, act=act),
+            BaseConv(channels[2], channels[3], 3, 2, norm=norm, act=act),
             CSPLayer(
-                base_channels * 8,
-                base_channels * 8,
+                channels[3],
+                channels[3],
                 num_bottle=base_depth * 3,
                 norm=norm,
                 act=act,
@@ -63,11 +62,11 @@ class CSPDarkNet(nn.Module):
 
         # dark5
         self.dark5 = nn.Sequential(
-            BaseConv(base_channels * 8, base_channels * 16, 3, 2, norm=norm, act=act),
-            SPPBottleneck(base_channels * 16, base_channels * 16, norm=norm, act=act),
+            BaseConv(channels[3], channels[4], 3, 2, norm=norm, act=act),
+            SPPBottleneck(channels[4], channels[4], norm=norm, act=act),
             CSPLayer(
-                base_channels * 16,
-                base_channels * 16,
+                channels[4],
+                channels[4],
                 num_bottle=base_depth,
                 shortcut=False,
                 norm=norm,
