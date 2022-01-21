@@ -1,0 +1,20 @@
+# Parameters
+
+MODEL:
+    CSPDARKNET:
+        DEPTH: 0.5
+        WIDTH: 0.5
+        OUT_FEATURES: ["dark3", "dark4", "dark5"]
+        NORM: "bn"
+        ACT: "silu"
+    PAFPN:
+        DEPTH: 0.5
+        NORM: "bn"
+        ACT: "silu"
+    YOLOXHEAD:
+        CLASSES: 6
+
+DATASET:
+    DIR: 'D:\Code\Datasets\Detection\Steel_NEU\COCO'
+    TRAIN_JSON: 'train.json'
+    IMG_SIZE: [224,224]

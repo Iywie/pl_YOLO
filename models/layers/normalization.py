@@ -1,0 +1,11 @@
+import torch.nn as nn
+
+
+def get_normalization(name, out_channels):
+    if name == "bn":
+        module = nn.BatchNorm2d(out_channels)
+    elif name == "ln":
+        module = nn.LayerNorm(out_channels)
+    else:
+        raise AttributeError("Unsupported normalization function type: {}".format(name))
+    return module
