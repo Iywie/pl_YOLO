@@ -61,7 +61,7 @@ class COCODataset(Dataset):
 
         # Read annotation from self
         id_ = self.ids[index]
-        res, img_info, resized_info, img_name = self.annotations[id_]
+        res, img_hw, resized_info, img_name = self.annotations[id_]
 
         # load image from file
         img = self.load_resized_img(index)
@@ -70,10 +70,10 @@ class COCODataset(Dataset):
             img = torch.Tensor(img)
         else:
             target = res
-        return img, target, img_info, np.array([id_]), img_name
+        return img, target, img_hw, np.array([id_]), img_name
 
     def _load_coco_annotations(self):
-        return [self.load_anno_from_id(_ids) for _ids in self.ids]
+        return [self.load_anno_from_id(_id) for _id in self.ids]
 
     def load_anno_from_id(self, id_):
         im_ann = self.coco.loadImgs([id_])[0]  # im_ann: [file_name, height, width, id]
@@ -102,7 +102,7 @@ class COCODataset(Dataset):
         r = min(self.img_size[0] / height, self.img_size[1] / width)
         res[:, :4] *= r
 
-        img_info = (height, width)
+        img_hw = (height, width)
         resized_info = (int(height * r), int(width * r))
 
         file_name = (
@@ -111,7 +111,7 @@ class COCODataset(Dataset):
             else "{:012}".format(id) + ".jpg"
         )
 
-        return res, img_info, resized_info, file_name
+        return res, img_hw, resized_info, file_name
 
     def load_resized_img(self, index):
         img = self.load_image(index)

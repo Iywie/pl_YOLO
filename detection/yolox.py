@@ -1,15 +1,19 @@
 from pytorch_lightning import LightningModule
+
+from data import TrainTransform, ValTransform
 import models.backbones as backbone
 import models.necks as neck
 import models.heads as head
+import models.evaluators as evaluator
+
 from torch.optim import Adam
-from data import TrainTransform, ValTransform
 
 
 class LitYOLOX(LightningModule):
 
     def __init__(self, cfgs):
         super().__init__()
+
         self.backbone_cfgs = cfgs['CSPDARKNET']
         self.neck_cfgs = cfgs['PAFPN']
         self.head_cfgs = cfgs['YOLOXHEAD']
@@ -32,6 +36,7 @@ class LitYOLOX(LightningModule):
         self.backbone = backbone.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = neck.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
         self.head = head.YOLOXHead(num_classes, stride, n_channels, n_norm, n_act)
+        self.decoder = evaluator.decoder()
 
     def forward(self, x):
         x = self.backbone(x)
@@ -54,7 +59,15 @@ class LitYOLOX(LightningModule):
         }
         return loss
 
-    def validation_step(self, *args, **kwargs):
+    def validation_step(self, batch, batch_idx):
+        imgs, labels, img_hw, image_id, img_name = batch
+        preds = self.backbone(imgs)
+        preds = self.neck(preds)
+        preds = self.head(preds)
+        output = self.decoder(preds)
+
+
+
 
     def configure_optimizers(self):
         optimizer = Adam(self.parameters(), lr=0.03)
@@ -94,14 +107,6 @@ class LitYOLOX(LightningModule):
             preprocess=ValTransform(legacy=False),
         )
         val_loader = DataLoader(dataset, batch_size=16, num_workers=4, shuffle=False)
-        evaluator = COCOEvaluator(
-            dataloader=val_loader,
-            img_size=img_size,
-            confthre=self.test_conf,
-            nmsthre=self.nmsthre,
-            num_classes=self.num_classes,
-            testdev=testdev,
-        )
-
+        return val_loader
 
 
