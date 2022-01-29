@@ -31,8 +31,8 @@ class YOLOXHead(nn.Module):
         for i in range(len(in_channels)):
             self.stems.append(
                 BaseConv(
-                    in_channels=int(in_channels[i]),
-                    out_channels=int(256),
+                    in_channels=in_channels[i],
+                    out_channels=256,
                     ksize=1,
                     stride=1,
                     act=act,
@@ -87,7 +87,7 @@ class YOLOXHead(nn.Module):
                 )
             )
 
-        self.use_l1 = False
+        self.use_l1 = True
         self.l1_loss = nn.L1Loss(reduction="none")
         self.bcewithlog_loss = nn.BCEWithLogitsLoss(reduction="none")
         self.iou_loss = IOUloss(reduction="none")
@@ -192,6 +192,7 @@ class YOLOXHead(nn.Module):
         output = output.permute(0, 1, 3, 4, 2).reshape(
             batch_size, self.n_anchors * hsize * wsize, -1
         )
+
         grid = grid.view(1, -1, 2)
         output[..., :2] = (output[..., :2] + grid) * stride
         output[..., 2:4] = torch.exp(output[..., 2:4]) * stride
@@ -544,7 +545,7 @@ class YOLOXHead(nn.Module):
         b_b = gt_bboxes_per_image_b - y_centers_per_image
         bbox_deltas = torch.stack([b_l, b_t, b_r, b_b], 2)
 
-        # 多个gt没有重叠的话候选框数量相加，而有重叠情况下（未知）
+        # is_in_boxes_all is True when a grid is in any one of ground truth
         is_in_boxes = bbox_deltas.min(dim=-1).values > 0.0
         is_in_boxes_all = is_in_boxes.sum(dim=0) > 0
 
@@ -573,7 +574,7 @@ class YOLOXHead(nn.Module):
         is_in_centers = center_deltas.min(dim=-1).values > 0.0
         is_in_centers_all = is_in_centers.sum(dim=0) > 0
 
-        # in boxes and in centers
+        # in boxes or in centers
         is_in_boxes_anchor = is_in_boxes_all | is_in_centers_all
 
         is_in_boxes_and_center = (
@@ -598,6 +599,7 @@ class YOLOXHead(nn.Module):
 
         del topk_ious, dynamic_ks, pos_idx
 
+        # For ambiguous anchors, choose the one have the smallest cost.
         anchor_matching_gt = matching_matrix.sum(0)
         if (anchor_matching_gt > 1).sum() > 0:
             _, cost_argmin = torch.min(cost[:, anchor_matching_gt > 1], dim=0)
@@ -608,6 +610,7 @@ class YOLOXHead(nn.Module):
 
         fg_mask[fg_mask.clone()] = fg_mask_inboxes
 
+        # 先mask选择有分配的anchor，再取索引得到所属gt
         matched_gt_inds = matching_matrix[:, fg_mask_inboxes].argmax(0)  # 每个gt的k个anchor分给gt认领类别
         # k个anchor的类别获得
         gt_matched_classes = gt_classes[matched_gt_inds]

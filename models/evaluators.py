@@ -2,23 +2,26 @@ import torch
 import torchvision
 
 
-def decoder(
+def COCOEvaluator(
     outputs,
     num_classes,
+    nmsthre,
     confthre,
-    nmsthre
-
 ):
     """
     :param outputs: [batch, num_prediction, prediction]
-    :param num_classes:
-    :param confthre:
+    :param num_classes:.
     :param nmsthre:
+    :param confthre:
     :return:
     """
+    data_list = []
+
     # Select the prediction by confidence and nms.
     outputs = postprocess(outputs, num_classes, confthre, nmsthre)
 
+
+    data_list.extend(convert_to_coco_format(outputs, info_imgs, ids))
 
 
 def postprocess(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
@@ -68,3 +71,36 @@ def postprocess(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agn
         output[i] = detections
 
     return output
+
+
+def convert_to_coco_format(self, outputs, info_imgs, ids):
+    data_list = []
+    for (output, img_h, img_w, img_id) in zip(
+        outputs, info_imgs[0], info_imgs[1], ids
+    ):
+        if output is None:
+            continue
+        output = output.cpu()
+
+        bboxes = output[:, 0:4]
+
+        # preprocessing: resize
+        scale = min(
+            self.img_size[0] / float(img_h), self.img_size[1] / float(img_w)
+        )
+        bboxes /= scale
+        bboxes = xyxy2xywh(bboxes)
+
+        cls = output[:, 6]
+        scores = output[:, 4] * output[:, 5]
+        for ind in range(bboxes.shape[0]):
+            label = self.dataloader.dataset.class_ids[int(cls[ind])]
+            pred_data = {
+                "image_id": int(img_id),
+                "category_id": label,
+                "bbox": bboxes[ind].numpy().tolist(),
+                "score": scores[ind].numpy().item(),
+                "segmentation": [],
+            }  # COCO json format
+            data_list.append(pred_data)
+    return data_list

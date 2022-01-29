@@ -1,10 +1,11 @@
 from pytorch_lightning import LightningModule
 
 from data import TrainTransform, ValTransform
-import models.backbones as backbone
-import models.necks as neck
-import models.heads as head
-import models.evaluators as evaluator
+import models.backbones as BACKBONE
+import models.necks as NECK
+import models.heads as HEAD
+import models.model_loss as LOSS
+from models.evaluators import COCOEvaluator
 
 from torch.optim import Adam
 
@@ -30,13 +31,18 @@ class LitYOLOX(LightningModule):
         n_norm = self.neck_cfgs['NORM']
         n_act = self.neck_cfgs['ACT']
         # head parameters
-        num_classes = self.head_cfgs['CLASSES']
+        self.num_classes = self.head_cfgs['CLASSES']
         stride = [8, 16, 32]
+        # loss parameters
+        self.use_l1 = True
+        # evaluate parameters
+        self.nms_threshold = 0.7
+        self.confidence_threshold = 0.1
 
-        self.backbone = backbone.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
-        self.neck = neck.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
-        self.head = head.YOLOXHead(num_classes, stride, n_channels, n_norm, n_act)
-        self.decoder = evaluator.decoder()
+        self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
+        self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
+        self.head = HEAD.YOLOXHead(self.num_classes, stride, n_channels, n_norm, n_act)
+        self.decoder = HEAD.YOLOXDecoder(self.num_classes, stride, n_channels, n_norm, n_act)
 
     def forward(self, x):
         x = self.backbone(x)
@@ -46,9 +52,12 @@ class LitYOLOX(LightningModule):
 
     def training_step(self, batch, batch_idx):
         imgs, labels, _, _, _ = batch
-        preds = self.backbone(imgs)
-        preds = self.neck(preds)
-        loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = self.head(preds, labels, imgs)
+        output = self.backbone(imgs)
+        output = self.neck(output)
+        pred, x_shifts, y_shifts, expand_strides = self.decoder(output)
+        loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = LOSS.YOLOXLoss(
+            labels, pred, x_shifts, y_shifts, expand_strides, self.num_classes, self.use_l1)
+        # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = self.head(output, labels, imgs)
         output = {
             "total_loss": loss,
             "iou_loss": iou_loss,
@@ -61,13 +70,10 @@ class LitYOLOX(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         imgs, labels, img_hw, image_id, img_name = batch
-        preds = self.backbone(imgs)
-        preds = self.neck(preds)
-        preds = self.head(preds)
-        output = self.decoder(preds)
-
-
-
+        output = self.backbone(imgs)
+        output = self.neck(output)
+        pred, _, _, _ = self.decoder(output)
+        COCOEvaluator(pred, self.num_classes, self.nms_threshold, self.confidence_threshold)
 
     def configure_optimizers(self):
         optimizer = Adam(self.parameters(), lr=0.03)

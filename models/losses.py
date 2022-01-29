@@ -176,8 +176,8 @@ def weight_reduce_loss(loss, weight=None, reduction='mean', avg_factor=None):
     Args:
         loss (Tensor): Element-wise loss.
         weight (Tensor): Element-wise weights.
-        reduction (str): Same as built-in losses of PyTorch.
-        avg_factor (float): Avarage factor when computing the mean of losses.
+        reduction (str): Same as built-in model_loss of PyTorch.
+        avg_factor (float): Avarage factor when computing the mean of model_loss.
     Returns:
         Tensor: Processed loss values.
     """
