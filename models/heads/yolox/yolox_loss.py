@@ -59,48 +59,48 @@ def YOLOXLoss(labels, outputs,
                 total_num_anchors,
                 num_gt,
             )
+            with torch.no_grad():
+                bboxes_preds_per_image = bboxes_preds_per_image[fg_mask]
+                cls_preds_ = cls_preds[batch_idx][fg_mask]
+                obj_preds_ = obj_preds[batch_idx][fg_mask]
+                num_in_boxes_anchor = bboxes_preds_per_image.shape[0]
 
-            bboxes_preds_per_image = bboxes_preds_per_image[fg_mask]
-            cls_preds_ = cls_preds[batch_idx][fg_mask]
-            obj_preds_ = obj_preds[batch_idx][fg_mask]
-            num_in_boxes_anchor = bboxes_preds_per_image.shape[0]
+                pair_wise_ious = bboxes_iou(gt_bboxes_per_image, bboxes_preds_per_image, False)
+                # 以e为底的log函数，iou趋近1为0，iou为0趋近18.42
+                pair_wise_ious_loss = -torch.log(pair_wise_ious + 1e-8)
 
-            pair_wise_ious = bboxes_iou(gt_bboxes_per_image, bboxes_preds_per_image, False)
-            # 以e为底的log函数，iou趋近1为0，iou为0趋近18.42
-            pair_wise_ious_loss = -torch.log(pair_wise_ious + 1e-8)
+                gt_cls_per_image = (
+                    F.one_hot(gt_classes_per_image.to(torch.int64), num_classes)
+                        .float()
+                        .unsqueeze(1)
+                        .repeat(1, num_in_boxes_anchor, 1)
+                )
+                with torch.cuda.amp.autocast(enabled=False):
+                    cls_preds_ = (
+                            cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
+                            * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
+                    )
 
-            gt_cls_per_image = (
-                F.one_hot(gt_classes_per_image.to(torch.int64), num_classes)
-                    .float()
-                    .unsqueeze(1)
-                    .repeat(1, num_in_boxes_anchor, 1)
-            )
+                    pair_wise_cls_loss = F.binary_cross_entropy(
+                        cls_preds_.sqrt_(), gt_cls_per_image, reduction="none"
+                    ).sum(-1)
+                del cls_preds_
 
-            cls_preds_ = (
-                    cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
-                    * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
-            )
+                cost = (
+                        pair_wise_cls_loss
+                        + 3.0 * pair_wise_ious_loss
+                        + 100.0 * (~in_boxes_and_center_mask)
+                )
 
-            pair_wise_cls_loss = F.binary_cross_entropy(
-                cls_preds_.sqrt_(), gt_cls_per_image, reduction="none"
-            ).sum(-1)
-            del cls_preds_
-
-            cost = (
-                    pair_wise_cls_loss
-                    + 3.0 * pair_wise_ious_loss
-                    + 100.0 * (~in_boxes_and_center_mask)
-            )
-
-            # Dynamic k methods: select the final predictions.
-            (
-                fg_mask,
-                num_fg,
-                matched_gt_inds,
-                gt_matched_classes,
-                pred_ious_this_matching,
-            ) = dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes_per_image, num_gt)
-            del pair_wise_cls_loss, cost, pair_wise_ious, pair_wise_ious_loss
+                # Dynamic k methods: select the final predictions.
+                (
+                    fg_mask,
+                    num_fg,
+                    matched_gt_inds,
+                    gt_matched_classes,
+                    pred_ious_this_matching,
+                ) = dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes_per_image, num_gt)
+                del pair_wise_cls_loss, cost, pair_wise_ious, pair_wise_ious_loss
 
             # predict anchors of the whole batch.
             num_fgs += num_fg
@@ -141,6 +141,7 @@ def YOLOXLoss(labels, outputs,
 
     reg_weight = 5.0
     loss = reg_weight * loss_iou + loss_obj + loss_cls + loss_l1
+
     return (
         loss,
         reg_weight * loss_iou,

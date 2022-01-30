@@ -15,10 +15,11 @@ def main():
     configs = merge_config(args.cfg)
     print("Command Line Configs:", configs)
     model = LitYOLOX(configs)
+    torch.autograd.set_detect_anomaly(True)
 
-    trainer = Trainer()
+    trainer = Trainer(limit_train_batches=2, limit_val_batches=1)
 
-    trainer.fit(model)
+    trainer.fit(model, )
     # trainer.validate(model)
     # trainer.test(model)
 

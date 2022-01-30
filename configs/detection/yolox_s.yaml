@@ -21,4 +21,4 @@ DATASET:
     VAL_JSON: 'val.json'
     TEST_JSON: 'test.json'
     TRAIN_SIZE: [224,224]
-    TEST_SIZE: [224,224]
+    VAL_SIZE: [224,224]
