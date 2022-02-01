@@ -259,12 +259,16 @@ def dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes, num_gt):
 
     ious_in_boxes_matrix = pair_wise_ious
     n_candidate_k = min(10, ious_in_boxes_matrix.size(1))
-    topk_ious, _ = torch.topk(ious_in_boxes_matrix, n_candidate_k, dim=1)  # 得到每个gt的最大的前k个iou
+    # topk_ious, _ = torch.topk(ious_in_boxes_matrix, n_candidate_k, dim=1)  # 得到每个gt的最大的前k个iou
+    sorted_ious, indices = ious_in_boxes_matrix.sort(descending=True)
+    topk_ious = sorted_ious[:, :n_candidate_k]
     dynamic_ks = torch.clamp(topk_ious.sum(1).int(), min=1)  # 将最大iou相加取整得到k
     for gt_idx in range(num_gt):
-        _, pos_idx = torch.topk(  # If largest is False then the smallest k elements are returned.
-            cost[gt_idx], k=dynamic_ks[gt_idx].item(), largest=False
-        )  # 返回k个最小cost的anchor的索引
+        _, pos_idx = cost[gt_idx].sort()
+        pos_idx = pos_idx[:dynamic_ks[gt_idx].item()]
+        # _, pos_idx = torch.topk(  # If largest is False then the smallest k elements are returned.
+        #     cost[gt_idx], k=dynamic_ks[gt_idx].item(), largest=False
+        # )  # 返回k个最小cost的anchor的索引
         matching_matrix[gt_idx][pos_idx] = 1.0
 
     del topk_ious, dynamic_ks, pos_idx
