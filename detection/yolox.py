@@ -72,6 +72,11 @@ class LitYOLOX(LightningModule):
             "cls_loss": cls_loss,
             "num_fg": num_fg,
         }
+        self.log("iou_loss", iou_loss, prog_bar=True)
+        self.log("l1_loss", l1_loss, prog_bar=True)
+        self.log("conf_loss", conf_loss, prog_bar=True)
+        self.log("cls_loss", cls_loss, prog_bar=True)
+        self.log("num_fg", num_fg, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):

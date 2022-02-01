@@ -24,6 +24,9 @@ def default_argument_parser():
     parser.add_argument("--fp16", default=False, action="store_true", help="Adopting mix precision training.")
     parser.add_argument("--cache", dest="cache", default=False, action="store_true",
                         help="Caching images to RAM for faster training.")
+
+    parser.add_argument("--limit_train_batches", default=2, type=int, help="")
+    parser.add_argument("--limit_val_batches", default=1, type=int, help="")
     """
     Trainer parameters: 
         accelerator="gpu", 

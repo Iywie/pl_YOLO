@@ -11,13 +11,25 @@ from detection.yolox import LitYOLOX
 
 def main():
     pytorch_lightning.seed_everything(96)
-    cudnn.benchmark = True
     configs = merge_config(args.cfg)
     print("Command Line Configs:", configs)
     model = LitYOLOX(configs)
-    torch.autograd.set_detect_anomaly(True)
 
-    trainer = Trainer(limit_train_batches=2, limit_val_batches=1)
+    # parameters:
+    # https://pytorch-lightning.readthedocs.io/en/latest/api/pytorch_lightning.trainer.trainer.Trainer.html?highlight=trainer
+    trainer = Trainer(
+        # Train
+        # devices="cpu",
+        benchmark=False,
+        check_val_every_n_epoch=10,
+        # Experiment
+        # default_root_dir="lightning_logs",
+        log_every_n_steps=50,
+        # Debug
+        limit_train_batches=2,
+        limit_val_batches=1,
+        detect_anomaly=False,
+    )
 
     trainer.fit(model, )
     # trainer.validate(model)
