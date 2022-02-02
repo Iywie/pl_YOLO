@@ -26,8 +26,8 @@ def main():
         # default_root_dir="lightning_logs",
         log_every_n_steps=50,
         # Debug
-        limit_train_batches=2,
-        limit_val_batches=1,
+        # limit_train_batches=2,
+        # limit_val_batches=1,
         detect_anomaly=False,
     )
 

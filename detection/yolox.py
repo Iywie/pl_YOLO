@@ -6,7 +6,7 @@ import models.necks as NECK
 import models.heads as HEAD
 from models.evaluators.coco import COCOEvaluator, postprocess
 
-from torch.optim import Adam
+from torch.optim import Adam, SGD
 
 
 class LitYOLOX(LightningModule):
@@ -33,7 +33,7 @@ class LitYOLOX(LightningModule):
         self.num_classes = self.head_cfgs['CLASSES']
         stride = [8, 16, 32]
         # loss parameters
-        self.use_l1 = True
+        self.use_l1 = False
         # evaluate parameters
         self.nms_threshold = 0.7
         self.confidence_threshold = 0.1
@@ -98,7 +98,7 @@ class LitYOLOX(LightningModule):
         self.origin_hw_list = []
 
     def configure_optimizers(self):
-        optimizer = Adam(self.parameters(), lr=0.03)
+        optimizer = SGD(self.parameters(), lr=0.03)
         return optimizer
 
     def train_dataloader(self):
