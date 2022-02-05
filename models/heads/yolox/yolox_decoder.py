@@ -124,11 +124,11 @@ class YOLOXDecoder(nn.Module):
             h, w = output.shape[-2:]
 
             # Three steps to localize predictions: grid, shifts of x and y, grid with stride
-            grid = self.get_grid(output, k, data_type)
+            grid = self.get_grid(output, k)
             x_shifts.append(grid[:, :, 0])
             y_shifts.append(grid[:, :, 1])
             expanded_strides.append(
-                torch.zeros(1, grid.shape[1]).fill_(stride_this_level).type_as(inputs[0])
+                torch.zeros(1, grid.shape[1]).fill_(stride_this_level)
             )
 
             output = output.view(batch_size, self.n_anchors, n_ch, h, w)
@@ -147,10 +147,10 @@ class YOLOXDecoder(nn.Module):
         outputs = torch.cat(outputs, 1)
         return outputs, x_shifts, y_shifts, expanded_strides
 
-    def get_grid(self, output, k, dtype):
+    def get_grid(self, output, k):
         h, w = output.shape[-2:]
         yv, xv = torch.meshgrid([torch.arange(h), torch.arange(w)])
-        grid = torch.stack((xv, yv), 2).view(1, 1, h, w, 2).type(dtype)
+        grid = torch.stack((xv, yv), 2).view(1, 1, h, w, 2)
         grid = grid.view(1, -1, 2)
         self.grids[k] = grid
         return grid
