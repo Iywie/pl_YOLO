@@ -1,5 +1,6 @@
 # Parameters
 
+
 CSPDARKNET:
     DEPTH: 0.5
     INPUT_CHANNELS: [32, 64, 128, 256, 512] # five blocks
@@ -15,11 +16,9 @@ YOLOXHEAD:
     CLASSES: 6
 
 DATASET:
-    DIR: 'D:\Code\Datasets\Detection\Steel_NEU\COCO'
+    DIR: '/content/drive/MyDrive/COCO'
     TRAIN_JSON: 'train.json'
     VAL_JSON: 'val.json'
     TEST_JSON: 'test.json'
     TRAIN_SIZE: [224,224]
     VAL_SIZE: [224,224]
-    TRAIN_BATCH_SIZE: 16
-    VAL_BATCH_SIZE: 16
