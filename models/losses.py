@@ -25,7 +25,7 @@ class IOUloss(nn.Module):
         area_p = torch.prod(pred[:, 2:], 1)
         area_g = torch.prod(target[:, 2:], 1)
 
-        en = (tl < br).type(tl.type()).prod(dim=1)
+        en = (tl < br).to(tl).prod(dim=1)
         area_i = torch.prod(br - tl, 1) * en
         iou = (area_i) / (area_p + area_g - area_i + 1e-16)
 
@@ -156,7 +156,7 @@ def varifocal_loss(pred,
     # pred and target should be of the same size
     assert pred.size() == target.size()
     pred_sigmoid = pred.sigmoid()
-    target = target.type_as(pred)
+    target = target.to(pred)
     if iou_weighted:
         focal_weight = target * (target > 0.0).float() + \
                        alpha * (pred_sigmoid - target).abs().pow(gamma) * \
@@ -409,6 +409,6 @@ def bboxes_iou(bboxes_a, bboxes_b, xyxy=True):
 
         area_a = torch.prod(bboxes_a[:, 2:], 1)
         area_b = torch.prod(bboxes_b[:, 2:], 1)
-    en = (tl < br).type(tl.type()).prod(dim=2)
+    en = (tl < br).to(tl).prod(dim=2)
     area_i = torch.prod(br - tl, 2) * en  # * ((tl < br).all())
     return area_i / (area_a[:, None] + area_b - area_i)

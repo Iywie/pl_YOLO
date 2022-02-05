@@ -113,7 +113,7 @@ def YOLOXLoss(labels, outputs,
 
         cls_targets.append(cls_target)
         reg_targets.append(reg_target)
-        obj_targets.append(obj_target.to(reg_target.dtype))
+        obj_targets.append(obj_target.to(reg_target))
         fg_masks.append(fg_mask)
 
     # all predict anchors of this batch images
