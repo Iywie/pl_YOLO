@@ -3,7 +3,7 @@ import io
 import json
 import tempfile
 import contextlib
-from pycocotools.cocoeval import COCOeval
+from data.datasets.pycocotools.cocoeval import COCOeval
 
 
 def COCOEvaluator(
@@ -21,7 +21,7 @@ def COCOEvaluator(
         data_list.extend(
             convert_to_coco_format(detection_list[i], images_id[i], images_hw[i], img_size_val, val_dataset.ids)
         )
-        # coco box format: (x1, y1, w, h)
+        # pycocotools box format: (x1, y1, w, h)
     eval_results = evaluate_prediction(data_list, cocoGt)
     return eval_results
 

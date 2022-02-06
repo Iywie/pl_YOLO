@@ -64,11 +64,11 @@ class LitYOLOX(LightningModule):
         loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXLoss(
             labels, pred, x_shifts, y_shifts, expand_strides, self.num_classes, self.use_l1)
 
-        self.log("iou_loss", iou_loss, prog_bar=True)
-        self.log("l1_loss", l1_loss, prog_bar=True)
-        self.log("conf_loss", conf_loss, prog_bar=True)
-        self.log("cls_loss", cls_loss, prog_bar=True)
-        self.log("num_fg", num_fg, prog_bar=True)
+        self.log("metrics/batch/iou_loss", iou_loss, prog_bar=False)
+        self.log("metrics/batch/l1_loss", l1_loss, prog_bar=False)
+        self.log("metrics/batch/conf_loss", conf_loss, prog_bar=False)
+        self.log("metrics/batch/cls_loss", cls_loss, prog_bar=False)
+        self.log("metrics/batch/num_fg", num_fg, prog_bar=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -80,9 +80,15 @@ class LitYOLOX(LightningModule):
         self.detect_list.append(detections)
         self.image_id_list.append(image_id)
         self.origin_hw_list.append(img_hw)
+        return batch_idx
 
-    def validation_epoch_end(self, *args, **kwargs):
-        COCOEvaluator(self.detect_list, self.image_id_list, self.origin_hw_list, self.img_size_val, self.val_dataset)
+    def validation_epoch_end(self, batch_idx):
+        ap50_95, ap50, summary = COCOEvaluator(self.detect_list, self.image_id_list, self.origin_hw_list, self.img_size_val, self.val_dataset)
+        print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
+        print(summary)
+        self.log("metrics/evaluate/mAP", ap50_95, prog_bar=False)
+        self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
+        self.log("metrics/evaluate/summary", summary, prog_bar=False)
         self.detect_list = []
         self.image_id_list = []
         self.origin_hw_list = []

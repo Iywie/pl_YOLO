@@ -149,7 +149,7 @@ class YOLOXDecoder(nn.Module):
     def get_grid(self, output, k):
         h, w = output.shape[-2:]
         yv, xv = torch.meshgrid([torch.arange(h), torch.arange(w)])
-        grid = torch.stack((xv, yv), 2).view(1, 1, h, w, 2)
+        grid = torch.stack((xv, yv), 2).view(1, 1, h, w, 2).type_as(output)
         grid = grid.view(1, -1, 2)
         self.grids[k] = grid
         return grid
