@@ -105,7 +105,6 @@ class YOLOXDecoder(nn.Module):
         expanded_strides = []
         batch_size = inputs[0].shape[0]
         n_ch = 4 + 1 + self.n_anchors * self.num_classes  # the channel of one ground truth prediction.
-        data_type = inputs[0].type()
 
         for k, (cls_conv, reg_conv, stride_this_level, x) in enumerate(
                 zip(self.cls_convs, self.reg_convs, self.strides, inputs)
