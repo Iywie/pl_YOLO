@@ -12,8 +12,8 @@ from detection.yolox import LitYOLOX
 def main():
     neptune_logger = NeptuneLogger(
         project="chihaya/YOLOX",
-        api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haS"
-                  "IsImFwaV9rZXkiOiI5MGNmMzI2ZC1mOGYyLTQ2NzUtOTk0OS1kMmI3OGE1MTYwODQifQ==",
+        api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHV"
+                  "uZS5haSIsImFwaV9rZXkiOiI5MGNmMzI2ZC1mOGYyLTQ2NzUtOTk0OS1kMmI3OGE1MTYwODQifQ==",
         log_model_checkpoints=False,
         tags=["YOLOX", "NEU-DET"],  # optional
     )
@@ -33,7 +33,7 @@ def main():
         # gpus=1,
         # amp_backend="apex",
         # amp_level=01,
-        # auto_lr_find=True,
+        auto_lr_find=True,
         # benchmark=False,
         check_val_every_n_epoch=1,
         callbacks=[device_stats],

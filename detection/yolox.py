@@ -76,19 +76,20 @@ class LitYOLOX(LightningModule):
         output = self.backbone(imgs)
         output = self.neck(output)
         pred, _, _, _ = self.decoder(output)
-        detections = coco_post(pred.cpu(), self.num_classes, self.nms_threshold, self.confidence_threshold)
+        detections = coco_post(pred, self.num_classes, self.nms_threshold, self.confidence_threshold)
         self.detect_list.append(detections)
         self.image_id_list.append(image_id)
         self.origin_hw_list.append(img_hw)
         return batch_idx
 
     def validation_epoch_end(self, batch_idx):
-        ap50_95, ap50, summary = COCOEvaluator(self.detect_list, self.image_id_list, self.origin_hw_list, self.img_size_val, self.val_dataset)
+        ap50_95, ap50, summary = COCOEvaluator(
+            self.detect_list, self.image_id_list, self.origin_hw_list, self.img_size_val, self.val_dataset)
         print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
         print(summary)
         self.log("metrics/evaluate/mAP", ap50_95, prog_bar=False)
         self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
-        self.log("metrics/evaluate/summary", summary, prog_bar=False)
+        # self.log("metrics/evaluate/summary", summary, prog_bar=False)
         self.detect_list = []
         self.image_id_list = []
         self.origin_hw_list = []
