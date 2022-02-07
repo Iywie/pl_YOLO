@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.losses import bboxes_iou, ciou_loss
+from models.losses import bboxes_iou, ciou_loss, IOUloss
 
 
 def YOLOXLoss(labels, outputs,
@@ -50,16 +50,17 @@ def YOLOXLoss(labels, outputs,
             gt_classes_per_image = labels[batch_idx, :num_gt, 0]
             bboxes_preds_per_image = bbox_preds[batch_idx]
 
-            # Get valuable grids according ground truth
-            fg_mask, in_boxes_and_center_mask = get_in_boxes_info(
-                gt_bboxes_per_image,
-                expanded_strides,
-                x_shifts,
-                y_shifts,
-                total_num_anchors,
-                num_gt,
-            )
             with torch.no_grad():
+                # Get valuable grids according ground truth
+                fg_mask, in_boxes_and_center_mask = get_in_boxes_info(
+                    gt_bboxes_per_image,
+                    expanded_strides,
+                    x_shifts,
+                    y_shifts,
+                    total_num_anchors,
+                    num_gt,
+                )
+
                 bboxes_preds_per_image = bboxes_preds_per_image[fg_mask]
                 cls_preds_ = cls_preds[batch_idx][fg_mask]
                 obj_preds_ = obj_preds[batch_idx][fg_mask]
@@ -89,7 +90,7 @@ def YOLOXLoss(labels, outputs,
                 cost = (
                         pair_wise_cls_loss
                         + 3.0 * pair_wise_ious_loss
-                        + 100.0 * (~in_boxes_and_center_mask)
+                        + 100000.0 * (~in_boxes_and_center_mask)
                 )
 
                 # Dynamic k methods: select the final predictions.
@@ -113,7 +114,7 @@ def YOLOXLoss(labels, outputs,
 
         cls_targets.append(cls_target)
         reg_targets.append(reg_target)
-        obj_targets.append(obj_target.to(reg_target))
+        obj_targets.append(obj_target.type_as(reg_target))
         fg_masks.append(fg_mask)
 
     # all predict anchors of this batch images
@@ -124,7 +125,8 @@ def YOLOXLoss(labels, outputs,
 
     num_fgs = max(num_fgs, 1)
 
-    loss_iou = (ciou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
+    iou_loss = IOUloss(reduction="none")
+    loss_iou = (iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
 
     bcewithlog_loss = nn.BCEWithLogitsLoss(reduction="none")
     loss_obj = (bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)).sum() / num_fgs
@@ -265,9 +267,9 @@ def dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes, num_gt):
     dynamic_ks = torch.clamp(topk_ious.sum(1).int(), min=1)  # 将最大iou相加取整得到k
     for gt_idx in range(num_gt):
         _, pos_idx = cost[gt_idx].sort()
-        pos_idx = pos_idx[:dynamic_ks[gt_idx].item()]
+        pos_idx = pos_idx[:dynamic_ks[gt_idx].detach()]
         # _, pos_idx = torch.topk(  # If largest is False then the smallest k elements are returned.
-        #     cost[gt_idx], k=dynamic_ks[gt_idx].item(), largest=False
+        #     cost[gt_idx], k=dynamic_ks[gt_idx].detach(), largest=False
         # )  # 返回k个最小cost的anchor的索引
         matching_matrix[gt_idx][pos_idx] = 1.0
 
@@ -279,7 +281,7 @@ def dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes, num_gt):
         matching_matrix[:, anchor_matching_gt > 1] *= 0.0
         matching_matrix[cost_argmin, anchor_matching_gt > 1] = 1.0
     fg_mask_inboxes = matching_matrix.sum(0) > 0.0
-    num_fg = fg_mask_inboxes.sum().item()
+    num_fg = fg_mask_inboxes.sum().detach()
 
     # 最终符合的anchor mask
     fg_mask[fg_mask.clone()] = fg_mask_inboxes

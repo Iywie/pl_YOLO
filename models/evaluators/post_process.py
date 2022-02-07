@@ -25,9 +25,9 @@ def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnos
     class_prob = class_prob.sigmoid()
     prediction[:, :, 5:] = class_prob
 
-    obj_prob = prediction[:, :, 5]
+    obj_prob = prediction[:, :, 4]
     obj_prob = obj_prob.sigmoid()
-    prediction[:, :, 5] = obj_prob
+    prediction[:, :, 4] = obj_prob
 
     output = [None for _ in range(len(prediction))]
     for i, image_pred in enumerate(prediction):

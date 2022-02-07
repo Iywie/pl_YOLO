@@ -45,12 +45,11 @@ def main():
         log_every_n_steps=1,
         limit_train_batches=5,
         limit_val_batches=2,
-        max_epochs=10,
+        max_epochs=100,
         # reload_dataloaders_every_n_epochs=10,
-        # resume_from_checkpoint='',
     )
 
-    trainer.fit(model)
+    trainer.fit(model, ckpt_path=r"D:\Downloads\epoch=24-step=574.ckpt")
     # trainer.validate(model)
     # trainer.test(model)
 

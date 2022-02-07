@@ -96,7 +96,7 @@ class LitYOLOX(LightningModule):
         self.origin_hw_list = []
 
     def configure_optimizers(self):
-        optimizer = SGD(self.parameters(), lr=0.03)
+        optimizer = SGD(self.parameters(), lr=0.001, momentum=0.9)
         return optimizer
 
     def train_dataloader(self):

@@ -112,9 +112,12 @@ class YOLOXDecoder(nn.Module):
             # Change all inputs to the same channel. (like 256)
             x = self.stems[k](x)
 
-            cls_feat = cls_conv(x)
+            cls_x = x
+            reg_x = x
+
+            cls_feat = cls_conv(cls_x)
             cls_output = self.cls_preds[k](cls_feat)
-            reg_feat = reg_conv(x)
+            reg_feat = reg_conv(reg_x)
             reg_output = self.reg_preds[k](reg_feat)
             obj_output = self.obj_preds[k](reg_feat)
 
