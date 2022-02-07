@@ -60,6 +60,7 @@ class LitYOLOX(LightningModule):
         imgs, labels, _, _, _ = batch
         output = self.backbone(imgs)
         output = self.neck(output)
+        # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXHead(output, labels)
         pred, x_shifts, y_shifts, expand_strides = self.decoder(output)
         loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXLoss(
             labels, pred, x_shifts, y_shifts, expand_strides, self.num_classes, self.use_l1)
