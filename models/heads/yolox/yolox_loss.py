@@ -26,7 +26,7 @@ def YOLOXLoss(labels, outputs,
     total_num_anchors = outputs.shape[1]  # n_anchors_all (int)
     x_shifts = torch.cat(x_shifts, 1)  # [1, n_anchors_all]
     y_shifts = torch.cat(y_shifts, 1)  # [1, n_anchors_all]
-    expanded_strides = torch.cat(expanded_strides, 1)
+    expanded_strides = torch.cat(expanded_strides, 1).type_as(x_shifts)
 
     cls_targets = []
     reg_targets = []
