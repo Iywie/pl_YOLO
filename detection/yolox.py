@@ -35,8 +35,8 @@ class LitYOLOX(LightningModule):
         # loss parameters
         self.use_l1 = False
         # evaluate parameters
-        self.nms_threshold = 0.7
-        self.confidence_threshold = 0.1
+        self.nms_threshold = 0.65
+        self.confidence_threshold = 0.01
         # dataloader parameters
         self.img_size_train = tuple(self.dataset_cfgs['TRAIN_SIZE'])
         self.img_size_val = tuple(self.dataset_cfgs['VAL_SIZE'])
@@ -77,7 +77,7 @@ class LitYOLOX(LightningModule):
         output = self.backbone(imgs)
         output = self.neck(output)
         pred, _, _, _ = self.decoder(output)
-        detections = coco_post(pred, self.num_classes, self.nms_threshold, self.confidence_threshold)
+        detections = coco_post(pred, self.num_classes, self.confidence_threshold, self.nms_threshold)
         self.detect_list.append(detections)
         self.image_id_list.append(image_id)
         self.origin_hw_list.append(img_hw)

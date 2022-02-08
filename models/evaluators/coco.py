@@ -52,7 +52,6 @@ def convert_to_coco_format(outputs, ids, hws, val_size, class_ids):
     ):
         if output is None:
             continue
-        output = output.cpu()
 
         bboxes = output[:, 0:4]
 

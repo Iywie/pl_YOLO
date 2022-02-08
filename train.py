@@ -49,7 +49,7 @@ def main():
         # reload_dataloaders_every_n_epochs=10,
     )
 
-    trainer.fit(model, ckpt_path=r"D:\Downloads\epoch=24-step=574.ckpt")
+    trainer.fit(model, ckpt_path=r"D:\Downloads\epoch=21-step=505.ckpt")
     # trainer.validate(model)
     # trainer.test(model)
 
