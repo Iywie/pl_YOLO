@@ -3,7 +3,8 @@ import io
 import json
 import tempfile
 import contextlib
-from data.datasets.pycocotools.cocoeval import COCOeval
+# from data.datasets.pycocotools.cocoeval import COCOeval
+from models.evaluators.fast_coco_eval_api import COCOeval_opt as COCOeval
 
 
 def COCOEvaluator(
@@ -69,8 +70,8 @@ def convert_to_coco_format(outputs, ids, hws, val_size, class_ids):
             pred_data = {
                 "image_id": int(img_id),
                 "category_id": label,
-                "bbox": bboxes[ind].numpy().tolist(),
-                "score": scores[ind].numpy().item(),
+                "bbox": bboxes[ind].cpu().numpy().tolist(),
+                "score": scores[ind].cpu().numpy().item(),
                 "segmentation": [],
             }  # COCO json format
             data_list.append(pred_data)

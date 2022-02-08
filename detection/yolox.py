@@ -73,7 +73,7 @@ class LitYOLOX(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        imgs, labels, img_hw, image_id, img_name = batch
+        imgs, _, img_hw, image_id, img_name = batch
         output = self.backbone(imgs)
         output = self.neck(output)
         pred, _, _, _ = self.decoder(output)
@@ -96,7 +96,7 @@ class LitYOLOX(LightningModule):
         self.origin_hw_list = []
 
     def configure_optimizers(self):
-        optimizer = SGD(self.parameters(), lr=0.001, momentum=0.9)
+        optimizer = SGD(self.parameters(), lr=0.01, momentum=0.9, nesterov=True)
         return optimizer
 
     def train_dataloader(self):
@@ -111,8 +111,8 @@ class LitYOLOX(LightningModule):
             img_size=self.img_size_train,
             preprocess=TrainTransform(
                 max_labels=50,
-                flip_prob=0.5,
-                hsv_prob=1.0
+                flip_prob=0,
+                hsv_prob=0
             )
         )
         train_loader = DataLoader(dataset, batch_size=self.train_batch_size, num_workers=4, shuffle=False)
