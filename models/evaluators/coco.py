@@ -3,8 +3,7 @@ import io
 import json
 import tempfile
 import contextlib
-# from data.datasets.pycocotools.cocoeval import COCOeval
-from models.evaluators.fast_coco_eval_api import COCOeval_opt as COCOeval
+from data.datasets.pycocotools.cocoeval import COCOeval
 
 
 def COCOEvaluator(

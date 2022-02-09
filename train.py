@@ -43,7 +43,7 @@ def main():
         # enable_progress_bar=False,
         # logger=neptune_logger,
         log_every_n_steps=1,
-        limit_train_batches=5,
+        limit_train_batches=3,
         limit_val_batches=2,
         max_epochs=100,
         # reload_dataloaders_every_n_epochs=10,

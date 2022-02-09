@@ -60,10 +60,10 @@ class LitYOLOX(LightningModule):
         imgs, labels, _, _, _ = batch
         output = self.backbone(imgs)
         output = self.neck(output)
-        # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXHead(output, labels)
-        pred, x_shifts, y_shifts, expand_strides = self.decoder(output)
-        loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXLoss(
-            labels, pred, x_shifts, y_shifts, expand_strides, self.num_classes, self.use_l1)
+        loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = self.head(output, labels)
+        # pred, x_shifts, y_shifts, expand_strides = self.decoder(output)
+        # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXLoss(
+        #     labels, pred, x_shifts, y_shifts, expand_strides, self.num_classes, self.use_l1)
 
         self.log("metrics/batch/iou_loss", iou_loss, prog_bar=False)
         self.log("metrics/batch/l1_loss", l1_loss, prog_bar=False)
@@ -73,10 +73,11 @@ class LitYOLOX(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        imgs, _, img_hw, image_id, img_name = batch
+        imgs, labels, img_hw, image_id, img_name = batch
         output = self.backbone(imgs)
         output = self.neck(output)
-        pred, _, _, _ = self.decoder(output)
+        pred = self.head(output, labels)
+        # pred, _, _, _ = self.decoder(output)
         detections = coco_post(pred, self.num_classes, self.confidence_threshold, self.nms_threshold)
         self.detect_list.append(detections)
         self.image_id_list.append(image_id)
