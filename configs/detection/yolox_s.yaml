@@ -2,13 +2,13 @@
 
 CSPDARKNET:
     DEPTH: 0.5
-    INPUT_CHANNELS: [32, 64, 128, 256, 512] # five blocks
+    INPUT_CHANNELS: [64, 128, 256, 512, 1024] # five blocks
     OUT_FEATURES: ["dark3", "dark4", "dark5"]
     NORM: "bn"
     ACT: "silu"
 PAFPN:
     DEPTH: 0.5
-    INPUT_CHANNELS: [128, 256, 512]
+    INPUT_CHANNELS: [256, 512, 1024]
     NORM: "bn"
     ACT: "silu"
 YOLOXHEAD:
