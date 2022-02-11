@@ -3,13 +3,13 @@
 
 CSPDARKNET:
     DEPTH: 0.33
-    INPUT_CHANNELS: [64, 128, 256, 512, 1024] # five blocks
+    INPUT_CHANNELS: [16, 32, 64, 128, 256] # five blocks
     OUT_FEATURES: ["dark3", "dark4", "dark5"]
     NORM: "bn"
     ACT: "silu"
 PAFPN:
     DEPTH: 0.25
-    INPUT_CHANNELS: [256, 512, 1024]
+    INPUT_CHANNELS: [64, 128, 256]
     NORM: "bn"
     ACT: "silu"
 YOLOXHEAD:
@@ -22,5 +22,5 @@ DATASET:
     TEST_JSON: 'test.json'
     TRAIN_SIZE: [224,224]
     VAL_SIZE: [224,224]
-    TRAIN_BATCH_SIZE: 64
-    VAL_BATCH_SIZE: 64
+    TRAIN_BATCH_SIZE: 128
+    VAL_BATCH_SIZE: 128

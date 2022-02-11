@@ -23,11 +23,11 @@ class LitYOLOX(LightningModule):
         b_depth = self.backbone_cfgs['DEPTH']
         b_norm = self.backbone_cfgs['NORM']
         b_act = self.backbone_cfgs['ACT']
-        b_channels = self.backbone_cfgs['INPUT_CHANNELS'] * b_depth
+        b_channels = self.backbone_cfgs['INPUT_CHANNELS']
         out_features = self.backbone_cfgs['OUT_FEATURES']
         # neck parameters
         n_depth = self.neck_cfgs['DEPTH']
-        n_channels = self.neck_cfgs['INPUT_CHANNELS'] * n_depth
+        n_channels = self.neck_cfgs['INPUT_CHANNELS']
         n_norm = self.neck_cfgs['NORM']
         n_act = self.neck_cfgs['ACT']
         # head parameters
@@ -48,18 +48,18 @@ class LitYOLOX(LightningModule):
         self.detect_list = []
         self.image_id_list = []
         self.origin_hw_list = []
-        # # --------------- transform config ----------------- #
-        # self.mosaic_prob = 1.0
-        # self.mixup_prob = 1.0
-        # self.hsv_prob = 1.0
-        # self.flip_prob = 0.5
-        # self.degrees = 10.0
-        # self.translate = 0.1
-        # self.mosaic_scale = (0.1, 2)
-        # self.mixup_scale = (0.5, 1.5)
-        # self.shear = 2.0
-        # self.perspective = 0.0
-        # self.enable_mixup = True
+        # --------------- transform config ----------------- #
+        self.mosaic_prob = 1.0
+        self.mixup_prob = 1.0
+        self.hsv_prob = 1.0
+        self.flip_prob = 0.5
+        self.degrees = 10.0
+        self.translate = 0.1
+        self.mosaic_scale = (0.1, 2)
+        self.mixup_scale = (0.5, 1.5)
+        self.shear = 2.0
+        self.perspective = 0.0
+        self.enable_mixup = True
 
         self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
@@ -73,10 +73,10 @@ class LitYOLOX(LightningModule):
         imgs, labels, _, _, _ = batch
         output = self.backbone(imgs)
         output = self.neck(output)
-        # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = self.head(output, labels)
-        pred, x_shifts, y_shifts, expand_strides = self.decoder(output)
-        loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXLoss(
-            labels, pred, x_shifts, y_shifts, expand_strides, self.num_classes, self.use_l1)
+        loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = self.head(output, labels)
+        # pred, x_shifts, y_shifts, expand_strides = self.decoder(output)
+        # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXLoss(
+        #     labels, pred, x_shifts, y_shifts, expand_strides, self.num_classes, self.use_l1)
 
         self.log("metrics/batch/iou_loss", iou_loss, prog_bar=False)
         self.log("metrics/batch/l1_loss", l1_loss, prog_bar=False)
@@ -114,7 +114,7 @@ class LitYOLOX(LightningModule):
         return optimizer
 
     def train_dataloader(self):
-        from data.datasets.coco import COCODataset
+        from data.datasets.cocoDataset import COCODataset
         from torch.utils.data.dataloader import DataLoader
         data_dir = self.dataset_cfgs['DIR']
         json = self.dataset_cfgs['TRAIN_JSON']
@@ -151,7 +151,7 @@ class LitYOLOX(LightningModule):
         return train_loader
 
     def val_dataloader(self):
-        from data.datasets.coco import COCODataset
+        from data.datasets.cocoDataset import COCODataset
         from torch.utils.data.dataloader import DataLoader
         data_dir = self.dataset_cfgs['DIR']
         json = self.dataset_cfgs['VAL_JSON']

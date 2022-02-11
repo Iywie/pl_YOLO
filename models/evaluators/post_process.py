@@ -21,13 +21,13 @@ def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnos
     box_corner[:, :, 3] = prediction[:, :, 1] + prediction[:, :, 3] / 2
     prediction[:, :, :4] = box_corner[:, :, :4]
 
-    class_prob = prediction[:, :, 5:]
-    class_prob = class_prob.sigmoid()
-    prediction[:, :, 5:] = class_prob
-
-    obj_prob = prediction[:, :, 4]
-    obj_prob = obj_prob.sigmoid()
-    prediction[:, :, 4] = obj_prob
+    # class_prob = prediction[:, :, 5:]
+    # class_prob = class_prob.sigmoid()
+    # prediction[:, :, 5:] = class_prob
+    #
+    # obj_prob = prediction[:, :, 4]
+    # obj_prob = obj_prob.sigmoid()
+    # prediction[:, :, 4] = obj_prob
 
     output = [None for _ in range(len(prediction))]
     for i, image_pred in enumerate(prediction):
