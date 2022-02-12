@@ -129,7 +129,6 @@ class YOLOXHead(nn.Module):
 
             if self.training:
                 output = torch.cat([reg_output, obj_output, cls_output], 1)
-                # 添加预测框的grid相对位置信息
                 output, grid = self.get_output_and_grid(
                     output, k, stride_this_level, inputs[0].type()
                 )
@@ -175,7 +174,7 @@ class YOLOXHead(nn.Module):
             outputs = torch.cat(
                 [x.flatten(start_dim=2) for x in outputs], dim=2
             ).permute(0, 2, 1)
-            if True:
+            if self.decoe_in_inferdence:
                 return self.decode_outputs(outputs, dtype=inputs[0].type())
             else:
                 return outputs
@@ -184,7 +183,7 @@ class YOLOXHead(nn.Module):
         grid = self.grids[k]
 
         batch_size = output.shape[0]
-        n_ch = output.shape[1]
+        n_ch = 5 + self.num_classes
         hsize, wsize = output.shape[-2:]
         if grid.shape[2:4] != output.shape[2:4]:
             yv, xv = torch.meshgrid([torch.arange(hsize), torch.arange(wsize)])
@@ -195,7 +194,6 @@ class YOLOXHead(nn.Module):
         output = output.permute(0, 1, 3, 4, 2).reshape(
             batch_size, self.n_anchors * hsize * wsize, -1
         )
-
         grid = grid.view(1, -1, 2)
         output[..., :2] = (output[..., :2] + grid) * stride
         output[..., 2:4] = torch.exp(output[..., 2:4]) * stride
@@ -234,12 +232,7 @@ class YOLOXHead(nn.Module):
         cls_preds = outputs[:, :, 5:]  # [batch, n_anchors_all, n_cls]
 
         # calculate targets
-        mixup = labels.shape[2] > 5
-        if mixup:
-            label_cut = labels[..., :5]
-        else:
-            label_cut = labels
-        nlabel = (label_cut.sum(dim=2) > 0).sum(dim=1)  # number of objects
+        nlabel = (labels.sum(dim=2) > 0).sum(dim=1)  # number of objects
 
         total_num_anchors = outputs.shape[1]
         x_shifts = torch.cat(x_shifts, 1)  # [1, n_anchors_all]
@@ -295,11 +288,6 @@ class YOLOXHead(nn.Module):
                         imgs,
                     )
                 except RuntimeError:
-                    logger.error(
-                        "OOM RuntimeError is raised due to the huge memory cost during label assignment. \
-                           CPU mode is applied in this batch. If you want to avoid this issue, \
-                           try to reduce the batch size or image size."
-                    )
                     torch.cuda.empty_cache()
                     (
                         gt_matched_classes,
@@ -358,23 +346,20 @@ class YOLOXHead(nn.Module):
 
         num_fg = max(num_fg, 1)
         loss_iou = (
-            self.iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)
-        ).sum() / num_fg
-
+                       self.iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)
+                   ).sum() / num_fg
         loss_obj = (
-           self.bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)
-        ).sum() / num_fg
-
+                       self.bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)
+                   ).sum() / num_fg
         loss_cls = (
-            self.bcewithlog_loss(
-               cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets
-               )
-        ).sum() / num_fg
-
+                       self.bcewithlog_loss(
+                           cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets
+                       )
+                   ).sum() / num_fg
         if self.use_l1:
             loss_l1 = (
-                self.l1_loss(origin_preds.view(-1, 4)[fg_masks], l1_targets)
-            ).sum() / num_fg
+                          self.l1_loss(origin_preds.view(-1, 4)[fg_masks], l1_targets)
+                      ).sum() / num_fg
         else:
             loss_l1 = 0.0
 
@@ -452,7 +437,6 @@ class YOLOXHead(nn.Module):
                 .unsqueeze(1)
                 .repeat(1, num_in_boxes_anchor, 1)
         )
-        # 以e为底的log函数，iou趋近1为0，iou为0趋近18.42
         pair_wise_ious_loss = -torch.log(pair_wise_ious + 1e-8)
 
         if mode == "cpu":
@@ -461,7 +445,7 @@ class YOLOXHead(nn.Module):
         with torch.cuda.amp.autocast(enabled=False):
             cls_preds_ = (
                     cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
-                    * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
+                    * obj_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
             )
             pair_wise_cls_loss = F.binary_cross_entropy(
                 cls_preds_.sqrt_(), gt_cls_per_image, reduction="none"
@@ -471,8 +455,7 @@ class YOLOXHead(nn.Module):
         cost = (
                 pair_wise_cls_loss
                 + 3.0 * pair_wise_ious_loss
-                # + 100000.0 * (~is_in_boxes_and_center)
-                + 100.0 * (~is_in_boxes_and_center)
+                + 100000.0 * (~is_in_boxes_and_center)
         )
 
         (
@@ -541,18 +524,16 @@ class YOLOXHead(nn.Module):
                 .repeat(1, total_num_anchors)
         )
 
-        # 找出中心点在gt中的grid（许多）
         b_l = x_centers_per_image - gt_bboxes_per_image_l
         b_r = gt_bboxes_per_image_r - x_centers_per_image
         b_t = y_centers_per_image - gt_bboxes_per_image_t
         b_b = gt_bboxes_per_image_b - y_centers_per_image
         bbox_deltas = torch.stack([b_l, b_t, b_r, b_b], 2)
 
-        # is_in_boxes_all is True when a grid is in any one of ground truth
         is_in_boxes = bbox_deltas.min(dim=-1).values > 0.0
         is_in_boxes_all = is_in_boxes.sum(dim=0) > 0
-
         # in fixed center
+
         center_radius = 2.5
 
         gt_bboxes_per_image_l = (gt_bboxes_per_image[:, 0]).unsqueeze(1).repeat(
@@ -573,11 +554,10 @@ class YOLOXHead(nn.Module):
         c_t = y_centers_per_image - gt_bboxes_per_image_t
         c_b = gt_bboxes_per_image_b - y_centers_per_image
         center_deltas = torch.stack([c_l, c_t, c_r, c_b], 2)
-        # 找出中心点在gt的中心点center_radius范围内的grid（少量）
         is_in_centers = center_deltas.min(dim=-1).values > 0.0
         is_in_centers_all = is_in_centers.sum(dim=0) > 0
 
-        # in boxes or in centers
+        # in boxes and in centers
         is_in_boxes_anchor = is_in_boxes_all | is_in_centers_all
 
         is_in_boxes_and_center = (
@@ -588,37 +568,35 @@ class YOLOXHead(nn.Module):
     def dynamic_k_matching(self, cost, pair_wise_ious, gt_classes, num_gt, fg_mask):
         # Dynamic K
         # ---------------------------------------------------------------
-        matching_matrix = torch.zeros_like(cost)
+        matching_matrix = torch.zeros_like(cost, dtype=torch.uint8)
 
         ious_in_boxes_matrix = pair_wise_ious
         n_candidate_k = min(10, ious_in_boxes_matrix.size(1))
-        topk_ious, _ = torch.topk(ious_in_boxes_matrix, n_candidate_k, dim=1)  # 得到每个gt的最大的前k个iou
-        dynamic_ks = torch.clamp(topk_ious.sum(1).int(), min=1)  # 将最大iou相加取整得到k
+        topk_ious, _ = torch.topk(ious_in_boxes_matrix, n_candidate_k, dim=1)
+        dynamic_ks = torch.clamp(topk_ious.sum(1).int(), min=1)
+        dynamic_ks = dynamic_ks.tolist()
         for gt_idx in range(num_gt):
-            _, pos_idx = torch.topk(  # If largest is False then the k smallest elements are returned.
-                cost[gt_idx], k=dynamic_ks[gt_idx].item(), largest=False
-            )  # 返回k个最小cost的anchor的索引
-            matching_matrix[gt_idx][pos_idx] = 1.0
+            _, pos_idx = torch.topk(
+                cost[gt_idx], k=dynamic_ks[gt_idx], largest=False
+            )
+            matching_matrix[gt_idx][pos_idx] = 1
 
         del topk_ious, dynamic_ks, pos_idx
 
-        # For ambiguous anchors, choose the one have the smallest cost.
         anchor_matching_gt = matching_matrix.sum(0)
         if (anchor_matching_gt > 1).sum() > 0:
             _, cost_argmin = torch.min(cost[:, anchor_matching_gt > 1], dim=0)
-            matching_matrix[:, anchor_matching_gt > 1] *= 0.0
-            matching_matrix[cost_argmin, anchor_matching_gt > 1] = 1.0
-        fg_mask_inboxes = matching_matrix.sum(0) > 0.0
+            matching_matrix[:, anchor_matching_gt > 1] *= 0
+            matching_matrix[cost_argmin, anchor_matching_gt > 1] = 1
+        fg_mask_inboxes = matching_matrix.sum(0) > 0
         num_fg = fg_mask_inboxes.sum().item()
 
         fg_mask[fg_mask.clone()] = fg_mask_inboxes
 
-        # 先mask选择有分配的anchor，再取索引得到所属gt
-        matched_gt_inds = matching_matrix[:, fg_mask_inboxes].argmax(0)  # 每个gt的k个anchor分给gt认领类别
-        # k个anchor的类别获得
+        matched_gt_inds = matching_matrix[:, fg_mask_inboxes].argmax(0)
         gt_matched_classes = gt_classes[matched_gt_inds]
 
         pred_ious_this_matching = (matching_matrix * pair_wise_ious).sum(0)[
             fg_mask_inboxes
-        ]  # k个anchor的ious获得
+        ]
         return num_fg, gt_matched_classes, pred_ious_this_matching, matched_gt_inds

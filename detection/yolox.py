@@ -1,3 +1,4 @@
+import torch
 from pytorch_lightning import LightningModule
 
 from data import TrainTransform, ValTransform
@@ -5,11 +6,10 @@ from data.mosaic_detection import MosaicDetection
 import models.backbones as BACKBONE
 import models.necks as NECK
 import models.heads as HEAD
-from models.evaluators.coco import COCOEvaluator
+from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
 from models.evaluators.post_process import coco_post
 
 from torch.optim import Adam, SGD
-from torch.optim.lr_scheduler import OneCycleLR
 
 
 class LitYOLOX(LightningModule):
@@ -91,14 +91,15 @@ class LitYOLOX(LightningModule):
         output = self.backbone(imgs)
         output = self.neck(output)
         # pred = self.head(output, labels)
-        pred, _, _, _ = self.decoder(output)
+        pred = self.decoder(output)
         detections = coco_post(pred, self.num_classes, self.confidence_threshold, self.nms_threshold)
-        self.detect_list.append(detections)
-        self.image_id_list.append(image_id)
-        self.origin_hw_list.append(img_hw)
-        return batch_idx
+        detections = convert_to_coco_format(detections, image_id, img_hw, self.img_size_val, self.val_dataset.class_ids)
+        return detections
 
-    def validation_epoch_end(self, batch_idx):
+    def validation_epoch_end(self, validation_step_outputs):
+        detect_list = []
+        for i in range(len(validation_step_outputs)):
+            detect_list += validation_step_outputs[i]
         ap50_95, ap50, summary = COCOEvaluator(
             self.detect_list, self.image_id_list, self.origin_hw_list, self.img_size_val, self.val_dataset)
         print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
@@ -112,17 +113,7 @@ class LitYOLOX(LightningModule):
 
     def configure_optimizers(self):
         optimizer = SGD(self.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
-        steps_per_epoch = 1440 // self.train_batch_size
-        scheduler_dict = {
-            "scheduler": OneCycleLR(
-                optimizer,
-                0.1,
-                epochs=self.trainer.max_epochs,
-                steps_per_epoch=steps_per_epoch,
-            ),
-            "interval": "step",
-        }
-        return {"optimizer": optimizer, "lr_scheduler": scheduler_dict}
+        return optimizer
 
     def train_dataloader(self):
         from data.datasets.cocoDataset import COCODataset

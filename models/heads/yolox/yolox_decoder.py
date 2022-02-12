@@ -153,7 +153,10 @@ class YOLOXDecoder(nn.Module):
 
         # outputs: [batch_size, all layer predictions, n_ch]
         outputs = torch.cat(outputs, 1)
-        return outputs, x_shifts, y_shifts, expanded_strides
+        if self.training:
+            return outputs, x_shifts, y_shifts, expanded_strides
+        else:
+            return outputs
 
     def get_grid(self, output, k, h, w):
         yv, xv = torch.meshgrid([torch.arange(h), torch.arange(w)])
