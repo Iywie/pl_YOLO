@@ -32,7 +32,7 @@ class YOLOXHead(nn.Module):
             self.stems.append(
                 BaseConv(
                     in_channels=in_channels[i],
-                    out_channels=256,
+                    out_channels=in_channels[0],
                     ksize=1,
                     stride=1,
                     act=act,
@@ -42,15 +42,15 @@ class YOLOXHead(nn.Module):
             self.cls_convs.append(
                 nn.Sequential(
                     *[
-                        conv(256, 256, ksize=3, stride=1, norm=norm, act=act),
-                        conv(256, 256, ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
                     ]
                 )
             )
 
             self.cls_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256),
+                    in_channels=in_channels[0],
                     out_channels=self.n_anchors * self.num_classes,
                     kernel_size=1,
                     stride=1,
@@ -61,15 +61,15 @@ class YOLOXHead(nn.Module):
             self.reg_convs.append(
                 nn.Sequential(
                     *[
-                        conv(int(256), 256, ksize=3, stride=1, norm=norm, act=act),
-                        conv(int(256), 256, ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
                     ]
                 )
             )
 
             self.reg_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256),
+                    in_channels=in_channels[0],
                     out_channels=4,
                     kernel_size=1,
                     stride=1,
@@ -79,7 +79,7 @@ class YOLOXHead(nn.Module):
 
             self.obj_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256),
+                    in_channels=in_channels[0],
                     out_channels=self.n_anchors * 1,
                     kernel_size=1,
                     stride=1,
@@ -118,9 +118,12 @@ class YOLOXHead(nn.Module):
             # Change all inputs to the same channel. (like 256)
             x = self.stems[k](x)
 
-            cls_feat = cls_conv(x)
+            cls_x = x
+            reg_x = x
+
+            cls_feat = cls_conv(cls_x)
             cls_output = self.cls_preds[k](cls_feat)
-            reg_feat = reg_conv(x)
+            reg_feat = reg_conv(reg_x)
             reg_output = self.reg_preds[k](reg_feat)
             obj_output = self.obj_preds[k](reg_feat)
 

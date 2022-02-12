@@ -24,6 +24,7 @@ class COCODataset(Dataset):
             name="train",
             img_size=(416, 416),
             preprocess=None,
+            mosaic=None,
     ):
         super().__init__()
         self.data_dir = data_dir
@@ -31,6 +32,8 @@ class COCODataset(Dataset):
         self.name = name
         self.img_size = img_size
         self.preprocess = preprocess
+        self.mosaic = mosaic
+
         self.coco = COCO(os.path.join(self.data_dir, "annotations", self.json_file))
         self.ids = self.coco.getImgIds()
         self.class_ids = sorted(self.coco.getCatIds())
@@ -42,29 +45,26 @@ class COCODataset(Dataset):
     def __getitem__(self, index):
         """
         One image / label pair for the given index is picked up and pre-processed.
-
         Args:
             index (int): data index
-
         Returns:
             img (numpy.ndarray): pre-processed image
             padded_labels (torch.Tensor): pre-processed label data.
-                The shape is :math:`[max_labels, 5]`.
-                each label consists of [class, xc, yc, w, h]:
-                    class (float): class index.
-                    xc, yc (float) : center of bbox whose values range from 0 to 1.
-                    w, h (float) : size of bbox whose values range from 0 to 1.
-            info_img : tuple of h, w.
-                h, w (int): original shape of the image
+                The shape is: [max_labels, 5]
+                each label consists of [class, cx, cy, w, h]
+            info_img : tuple of origin h, w
             img_id (int): same as the input index. Used for evaluation.
         """
 
         # Read annotation from self
         id_ = self.ids[index]
         res, img_hw, resized_info, img_name = self.annotations[id_]
-
         # load image from file
         img = self.load_resized_img(index)
+
+        # Mosaic transform
+        if self.mosaic is not None:
+            img, target = self.mosaic
         if self.preprocess is not None:
             img, target = self.preprocess(img, res, self.img_size)
             img = torch.Tensor(img)

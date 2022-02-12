@@ -1,5 +1,6 @@
 import torch
 import torchvision
+from models.evaluators.nms import non_max_suppression
 
 
 def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):

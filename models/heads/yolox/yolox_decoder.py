@@ -32,7 +32,7 @@ class YOLOXDecoder(nn.Module):
             self.stems.append(
                 BaseConv(
                     in_channels=int(in_channels[i]),
-                    out_channels=int(256),
+                    out_channels=int(in_channels[0]),
                     ksize=1,
                     stride=1,
                     act=act,
@@ -42,15 +42,15 @@ class YOLOXDecoder(nn.Module):
             self.cls_convs.append(
                 nn.Sequential(
                     *[
-                        conv(256, 256, ksize=3, stride=1, norm=norm, act=act),
-                        conv(256, 256, ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
                     ]
                 )
             )
 
             self.cls_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256),
+                    in_channels=int(in_channels[0]),
                     out_channels=self.n_anchors * self.num_classes,
                     kernel_size=(1, 1),
                     stride=(1, 1),
@@ -61,15 +61,15 @@ class YOLOXDecoder(nn.Module):
             self.reg_convs.append(
                 nn.Sequential(
                     *[
-                        conv(int(256), 256, ksize=3, stride=1, norm=norm, act=act),
-                        conv(int(256), 256, ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
                     ]
                 )
             )
 
             self.reg_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256),
+                    in_channels=in_channels[0],
                     out_channels=4,
                     kernel_size=(1, 1),
                     stride=(1, 1),
@@ -79,7 +79,7 @@ class YOLOXDecoder(nn.Module):
 
             self.obj_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256),
+                    in_channels=in_channels[0],
                     out_channels=self.n_anchors * 1,
                     kernel_size=(1, 1),
                     stride=(1, 1),
@@ -109,7 +109,7 @@ class YOLOXDecoder(nn.Module):
         for k, (cls_conv, reg_conv, stride_this_level, x) in enumerate(
                 zip(self.cls_convs, self.reg_convs, self.strides, inputs)
         ):
-            # Change all inputs to the same channel. (like 256)
+            # Change all inputs to the same channel.
             x = self.stems[k](x)
 
             cls_x = x
@@ -122,11 +122,17 @@ class YOLOXDecoder(nn.Module):
             obj_output = self.obj_preds[k](reg_feat)
 
             # output: [batch_size, n_ch, h, w]
-            output = torch.cat([reg_output, obj_output, cls_output], 1)
+            if self.training is True:
+                output = torch.cat([reg_output, obj_output, cls_output], 1)
+            else:
+                output = torch.cat([reg_output, obj_output.sigmoid(), cls_output.sigmoid()], 1)
             h, w = output.shape[-2:]
 
             # Three steps to localize predictions: grid, shifts of x and y, grid with stride
-            grid = self.get_grid(output, k)
+            if self.grids[k].shape[2:4] != output.shape[2:4]:
+                grid = self.get_grid(output, k, h, w)
+            else:
+                grid = self.grids[k]
             x_shifts.append(grid[:, :, 0])
             y_shifts.append(grid[:, :, 1])
             expanded_strides.append(
@@ -149,8 +155,7 @@ class YOLOXDecoder(nn.Module):
         outputs = torch.cat(outputs, 1)
         return outputs, x_shifts, y_shifts, expanded_strides
 
-    def get_grid(self, output, k):
-        h, w = output.shape[-2:]
+    def get_grid(self, output, k, h, w):
         yv, xv = torch.meshgrid([torch.arange(h), torch.arange(w)])
         grid = torch.stack((xv, yv), 2).view(1, 1, h, w, 2).type_as(output)
         grid = grid.view(1, -1, 2)
