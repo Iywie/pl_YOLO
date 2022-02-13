@@ -1,4 +1,3 @@
-import os
 import io
 import json
 import tempfile
@@ -6,19 +5,11 @@ import contextlib
 from data.datasets.pycocotools.cocoeval import COCOeval
 
 
-def COCOEvaluator(
-    detection_list,
-    val_dataset
-):
+def COCOEvaluator(data_dict, val_dataset):
 
     # detections: (x1, y1, x2, y2, obj_conf, class_conf, class)
     cocoGt = val_dataset.coco
     # pycocotools box format: (x1, y1, w, h)
-    eval_results = evaluate_prediction(detection_list, cocoGt)
-    return eval_results
-
-
-def evaluate_prediction(data_dict, cocoGt):
     annType = ["segm", "bbox", "keypoints"]
     if len(data_dict) > 0:
         _, tmp = tempfile.mkstemp()

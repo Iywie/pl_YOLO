@@ -1,5 +1,6 @@
 from pytorch_lightning import LightningModule
 
+
 from data import TrainTransform, ValTransform
 from data.mosaic_detection import MosaicDetection
 import models.backbones as BACKBONE
@@ -9,6 +10,7 @@ from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
 from models.evaluators.post_process import coco_post
 
 from torch.optim import Adam, SGD
+from models.lr_scheduler import CosineWarmupScheduler
 
 
 class LitYOLOX(LightningModule):
@@ -60,6 +62,9 @@ class LitYOLOX(LightningModule):
         self.shear = 2.0
         self.perspective = 0.0
         self.enable_mixup = True
+        # Training
+        self.warmup = 5
+
 
         self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
@@ -79,11 +84,12 @@ class LitYOLOX(LightningModule):
         pred, x_shifts, y_shifts, expand_strides = self.decoder(output)
         loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXLoss(
             labels, pred, x_shifts, y_shifts, expand_strides, self.num_classes, self.use_l1)
-
-        self.log("metrics/batch/iou_loss", iou_loss, prog_bar=True)
+        self.lr_scheduler.step()
+        self.log("lr", self.lr_scheduler.optimizer.param_groups[0]['lr'], prog_bar=True)
+        self.log("metrics/batch/iou_loss", iou_loss, prog_bar=False)
         self.log("metrics/batch/l1_loss", l1_loss, prog_bar=False)
-        self.log("metrics/batch/conf_loss", conf_loss, prog_bar=True)
-        self.log("metrics/batch/cls_loss", cls_loss, prog_bar=True)
+        self.log("metrics/batch/conf_loss", conf_loss, prog_bar=False)
+        self.log("metrics/batch/cls_loss", cls_loss, prog_bar=False)
         self.log("metrics/batch/num_fg", num_fg, prog_bar=False)
         return loss
 
@@ -113,7 +119,11 @@ class LitYOLOX(LightningModule):
         self.origin_hw_list = []
 
     def configure_optimizers(self):
-        optimizer = SGD(self.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
+        optimizer = SGD(self.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
+        steps_per_epoch = 1440 // self.train_batch_size
+        self.lr_scheduler = CosineWarmupScheduler(
+            optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch
+        )
         return optimizer
 
     def train_dataloader(self):
