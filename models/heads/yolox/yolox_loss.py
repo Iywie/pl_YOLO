@@ -76,21 +76,21 @@ def YOLOXLoss(labels, outputs,
                         .unsqueeze(1)
                         .repeat(1, num_in_boxes_anchor, 1)
                 )
-                with torch.cuda.amp.autocast(enabled=False):
-                    cls_preds_ = (
-                            cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
-                            * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
-                    )
 
-                    pair_wise_cls_loss = F.binary_cross_entropy(
-                        cls_preds_.sqrt_(), gt_cls_per_image, reduction="none"
-                    ).sum(-1)
+                cls_preds_ = (
+                    cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
+                    * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
+                )
+
+                pair_wise_cls_loss = F.binary_cross_entropy(
+                    cls_preds_.sqrt_(), gt_cls_per_image, reduction="none"
+                ).sum(-1)
                 del cls_preds_
 
                 cost = (
-                        pair_wise_cls_loss
-                        + 3.0 * pair_wise_ious_loss
-                        + 100000.0 * (~in_boxes_and_center_mask)
+                    pair_wise_cls_loss
+                    + 3.0 * pair_wise_ious_loss
+                    + 100000.0 * (~in_boxes_and_center_mask)
                 )
 
                 # Dynamic k methods: select the final predictions.
@@ -169,9 +169,7 @@ def get_in_boxes_info(
         (x_shifts_per_image + 0.5 * expanded_strides_per_image).unsqueeze(0).repeat(num_gt, 1)
     )  # [n_anchor] -> [n_gt, n_anchor]
     y_centers_per_image = (
-        (y_shifts_per_image + 0.5 * expanded_strides_per_image)
-            .unsqueeze(0)
-            .repeat(num_gt, 1)
+        (y_shifts_per_image + 0.5 * expanded_strides_per_image).unsqueeze(0).repeat(num_gt, 1)
     )
 
     gt_bboxes_per_image_l = (

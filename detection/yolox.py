@@ -1,4 +1,3 @@
-import torch
 from pytorch_lightning import LightningModule
 
 from data import TrainTransform, ValTransform
@@ -64,8 +63,10 @@ class LitYOLOX(LightningModule):
 
         self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
-        self.head = HEAD.YOLOXHead(self.num_classes, stride, n_channels, n_norm, n_act)
-        self.decoder = HEAD.YOLOXDecoder(self.num_classes, stride, n_channels, n_norm, n_act)
+        self.head = HEAD.DecoupledHead(self.num_classes, n_channels, n_norm, n_act)
+        self.decoder = HEAD.YOLOXDecoder(self.num_classes, stride)
+
+        self.head.initialize_biases(1e-2)
 
     def forward(self, x):
         return x
@@ -74,7 +75,7 @@ class LitYOLOX(LightningModule):
         imgs, labels, _, _, _ = batch
         output = self.backbone(imgs)
         output = self.neck(output)
-        # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = self.head(output, labels)
+        output = self.head(output)
         pred, x_shifts, y_shifts, expand_strides = self.decoder(output)
         loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXLoss(
             labels, pred, x_shifts, y_shifts, expand_strides, self.num_classes, self.use_l1)
@@ -90,7 +91,7 @@ class LitYOLOX(LightningModule):
         imgs, labels, img_hw, image_id, img_name = batch
         output = self.backbone(imgs)
         output = self.neck(output)
-        # pred = self.head(output, labels)
+        output = self.head(output)
         pred = self.decoder(output)
         detections = coco_post(pred, self.num_classes, self.confidence_threshold, self.nms_threshold)
         detections = convert_to_coco_format(detections, image_id, img_hw, self.img_size_val, self.val_dataset.class_ids)
@@ -101,7 +102,7 @@ class LitYOLOX(LightningModule):
         for i in range(len(validation_step_outputs)):
             detect_list += validation_step_outputs[i]
         ap50_95, ap50, summary = COCOEvaluator(
-            self.detect_list, self.image_id_list, self.origin_hw_list, self.img_size_val, self.val_dataset)
+            detect_list, self.val_dataset)
         print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
         print(summary)
         self.log("metrics/evaluate/mAP", ap50_95, prog_bar=False)
