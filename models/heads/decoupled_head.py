@@ -7,13 +7,14 @@ from models.layers.network_blocks import BaseConv
 class DecoupledHead(nn.Module):
     def __init__(
             self,
-            num_classes,
+            num_classes=80,
+            n_anchors=1,
             in_channels=None,
             norm='bn',
             act="silu",
     ):
         super().__init__()
-        self.n_anchors = 1
+        self.n_anchors = n_anchors
         self.num_classes = num_classes
         conv = BaseConv
         self.stems = nn.ModuleList()
@@ -66,7 +67,7 @@ class DecoupledHead(nn.Module):
             self.reg_preds.append(
                 nn.Conv2d(
                     in_channels=in_channels[0],
-                    out_channels=4,
+                    out_channels=self.n_anchors * 4,
                     kernel_size=(1, 1),
                     stride=(1, 1),
                     padding=0,
@@ -110,9 +111,6 @@ class DecoupledHead(nn.Module):
             obj_output = self.obj_preds[k](reg_feat)
 
             # output: [batch_size, n_ch, h, w]
-            if self.training is True:
-                output = torch.cat([reg_output, obj_output, cls_output], 1)
-            else:
-                output = torch.cat([reg_output, obj_output.sigmoid(), cls_output.sigmoid()], 1)
+            output = torch.cat([reg_output, obj_output, cls_output], 1)
             outputs.append(output)
         return outputs

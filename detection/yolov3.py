@@ -1,7 +1,6 @@
 from pytorch_lightning import LightningModule
 
 from data import TrainTransform, ValTransform
-from data.mosaic_detection import MosaicDetection
 import models.backbones as BACKBONE
 import models.necks as NECK
 import models.heads as HEAD
@@ -12,13 +11,14 @@ from torch.optim import Adam, SGD
 from models.lr_scheduler import CosineWarmupScheduler
 
 
-class LitYOLOX(LightningModule):
+class LitYOLOv3(LightningModule):
 
     def __init__(self, cfgs):
         super().__init__()
         self.backbone_cfgs = cfgs['CSPDARKNET']
         self.neck_cfgs = cfgs['PAFPN']
-        self.head_cfgs = cfgs['YOLOXHEAD']
+        self.head_cfgs = cfgs['DECOUPLEDHEAD']
+        self.decoder_cfgs = cfgs['DECODER']
         self.dataset_cfgs = cfgs['DATASET']
         # backbone parameters
         b_depth = self.backbone_cfgs['DEPTH']
@@ -33,8 +33,11 @@ class LitYOLOX(LightningModule):
         n_act = self.neck_cfgs['ACT']
         # head parameters
         self.num_classes = self.head_cfgs['CLASSES']
-        n_anchors = 1
-        stride = [8, 16, 32]
+        # decoder parameters
+        self.anchors = self.decoder_cfgs['ANCHORS']
+        n_anchors = len(self.anchors)
+        # anchors_mask = self.decoder_cfgs['ANCHORS_MASK']
+        self.strides = [8, 16, 32]
         # loss parameters
         self.use_l1 = False
         # evaluate parameters
@@ -64,8 +67,10 @@ class LitYOLOX(LightningModule):
         self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
         self.head = HEAD.DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
-        self.decoder = HEAD.YOLOXDecoder(self.num_classes, stride)
-
+        self.decoder = HEAD.YOLOv3Decoder(self.num_classes, n_anchors, self.anchors, self.strides)
+        self.loss = []
+        for i in range(3):
+            self.loss.append(HEAD.YOLOLoss(self.anchors[i], self.num_classes, self.img_size_train))
         self.head.initialize_biases(1e-2)
 
     def forward(self, x):
@@ -76,16 +81,24 @@ class LitYOLOX(LightningModule):
         output = self.backbone(imgs)
         output = self.neck(output)
         output = self.head(output)
-        pred, x_shifts, y_shifts, expand_strides = self.decoder(output)
-        loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOXLoss(
-            labels, pred, x_shifts, y_shifts, expand_strides, self.num_classes, self.use_l1)
+        loss = 0
+        for i in range(3):
+            _loss_item = self.loss[i](output[i], labels)
+        #     for j, l in enumerate(_loss_item):
+        #         losses[j].append(l)
+        # losses = [sum(map_loss) for map_loss in losses]
+            loss += _loss_item
+
+        # pred, maps_h, maps_w = self.decoder(output)
+        # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOv3Loss(
+        #     labels, pred, self.num_classes, self.anchors, self.strides, maps_h, maps_w)
         self.lr_scheduler.step()
         self.log("lr", self.lr_scheduler.optimizer.param_groups[0]['lr'], prog_bar=True)
-        self.log("metrics/batch/iou_loss", iou_loss, prog_bar=False)
-        self.log("metrics/batch/l1_loss", l1_loss, prog_bar=False)
-        self.log("metrics/batch/conf_loss", conf_loss, prog_bar=False)
-        self.log("metrics/batch/cls_loss", cls_loss, prog_bar=False)
-        self.log("metrics/batch/num_fg", num_fg, prog_bar=False)
+        # self.log("metrics/batch/iou_loss", iou_loss, prog_bar=False)
+        # self.log("metrics/batch/l1_loss", l1_loss, prog_bar=False)
+        # self.log("metrics/batch/conf_loss", conf_loss, prog_bar=False)
+        # self.log("metrics/batch/cls_loss", cls_loss, prog_bar=False)
+        # self.log("metrics/batch/num_fg", num_fg, prog_bar=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -108,7 +121,6 @@ class LitYOLOX(LightningModule):
         print(summary)
         self.log("metrics/evaluate/mAP", ap50_95, prog_bar=False)
         self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
-        # self.log("metrics/evaluate/summary", summary, prog_bar=False)
 
     def configure_optimizers(self):
         optimizer = SGD(self.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
@@ -134,24 +146,6 @@ class LitYOLOX(LightningModule):
                 hsv_prob=0
             )
         )
-        # dataset = MosaicDetection(
-        #     dataset,
-        #     mosaic=False,
-        #     img_size=self.img_size_train,
-        #     preproc=TrainTransform(
-        #         max_labels=120,
-        #         flip_prob=self.flip_prob,
-        #         hsv_prob=self.hsv_prob),
-        #     degrees=self.degrees,
-        #     translate=self.translate,
-        #     mosaic_scale=self.mosaic_scale,
-        #     mixup_scale=self.mixup_scale,
-        #     shear=self.shear,
-        #     perspective=self.perspective,
-        #     enable_mixup=self.enable_mixup,
-        #     mosaic_prob=self.mosaic_prob,
-        #     mixup_prob=self.mixup_prob,
-        # )
         train_loader = DataLoader(dataset, batch_size=self.train_batch_size, num_workers=4, shuffle=False)
         return train_loader
 

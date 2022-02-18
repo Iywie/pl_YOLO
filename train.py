@@ -7,6 +7,7 @@ from utils.defaults import default_argument_parser
 from utils.config_file import merge_config
 
 from detection.yolox import LitYOLOX
+from detection.yolov3 import LitYOLOv3
 
 
 def main():
@@ -23,11 +24,13 @@ def main():
     configs = merge_config(args.cfg)
     print("Command Line Configs:", configs)
 
-    model = LitYOLOX(configs)
+    # model = LitYOLOX(configs)
+    model = LitYOLOv3(configs)
+
     # neptune_logger.log_hyperparams(params=configs)
     # neptune_logger.log_model_summary(model=model, max_depth=-1)
 
-    # parameters:
+    # Trainer parameters:
     # https://pytorch-lightning.readthedocs.io/en/latest/api/pytorch_lightning.trainer.trainer.Trainer.html?highlight=trainer
     trainer = Trainer(
         # tpu_cores=8,
@@ -44,7 +47,7 @@ def main():
         # logger=neptune_logger,
         log_every_n_steps=1,
         limit_train_batches=3,
-        limit_val_batches=2,
+        limit_val_batches=0,
         max_epochs=100,
         # reload_dataloaders_every_n_epochs=10,
     )
