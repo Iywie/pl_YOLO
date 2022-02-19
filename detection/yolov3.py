@@ -67,10 +67,10 @@ class LitYOLOv3(LightningModule):
         self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
         self.head = HEAD.DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
-        self.decoder = HEAD.YOLOv3Decoder(self.num_classes, n_anchors, self.anchors, self.strides)
+        # self.decoder = HEAD.YOLOv3Decoder(self.num_classes, n_anchors, self.anchors, self.strides)
         self.loss = []
         for i in range(3):
-            self.loss.append(HEAD.YOLOLoss(self.anchors[i], self.num_classes, self.img_size_train))
+            self.loss.append(HEAD.YOLOv3Loss(self.anchors[i], self.num_classes, self.img_size_train))
         self.head.initialize_biases(1e-2)
 
     def forward(self, x):
@@ -82,12 +82,19 @@ class LitYOLOv3(LightningModule):
         output = self.neck(output)
         output = self.head(output)
         loss = 0
-        for i in range(3):
-            _loss_item = self.loss[i](output[i], labels)
+        for i in range(len(output)):
+            _loss = self.loss[i](output[i], labels)
+            loss += _loss
+        # losses_name = ["total_loss", "x", "y", "w", "h", "conf", "cls"]
+        # losses = []
+        # for _ in range(len(losses_name)):
+        #     losses.append([])
+        # for i in range(3):
+        #     _loss_item = self.loss[i](output[i], labels)
         #     for j, l in enumerate(_loss_item):
         #         losses[j].append(l)
-        # losses = [sum(map_loss) for map_loss in losses]
-            loss += _loss_item
+        # losses = [sum(l) for l in losses]
+        # loss = losses[0]
 
         # pred, maps_h, maps_w = self.decoder(output)
         # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOv3Loss(
@@ -106,7 +113,10 @@ class LitYOLOv3(LightningModule):
         output = self.backbone(imgs)
         output = self.neck(output)
         output = self.head(output)
-        pred = self.decoder(output)
+        pred = []
+        for i in range(len(output)):
+            _loss = self.loss[i](output[i])
+            pred.append(_loss)
         detections = coco_post(pred, self.num_classes, self.confidence_threshold, self.nms_threshold)
         detections = convert_to_coco_format(detections, image_id, img_hw, self.img_size_val, self.val_dataset.class_ids)
         return detections
@@ -123,7 +133,7 @@ class LitYOLOv3(LightningModule):
         self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
 
     def configure_optimizers(self):
-        optimizer = SGD(self.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
+        optimizer = SGD(self.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
         steps_per_epoch = 1440 // self.train_batch_size
         self.lr_scheduler = CosineWarmupScheduler(
             optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch
