@@ -71,19 +71,29 @@ class ValTransform:
         data
     """
 
-    def __init__(self, swap=(2, 0, 1), legacy=False):
+    def __init__(self, swap=(2, 0, 1), legacy=False, max_labels=50):
         self.swap = swap
         self.legacy = legacy
+        self.max_labels = max_labels
 
     # assume input is cv2 img for now
-    def __call__(self, img, res, input_size):
+    def __call__(self, img, targets, input_size):
         img, _ = preproc(img, input_size, self.swap)
         if self.legacy:
             img = img[::-1, :, :].copy()
             img /= 255.0
             img -= np.array([0.485, 0.456, 0.406]).reshape(3, 1, 1)
             img /= np.array([0.229, 0.224, 0.225]).reshape(3, 1, 1)
-        return img, np.zeros((1, 5))
+
+        boxes = targets[:, :4].copy()
+        labels = targets[:, 4].copy()
+
+        boxes = xyxy2cxcywh(boxes)
+        labels = np.expand_dims(labels, 1)
+        targets_t = np.hstack((labels, boxes))
+        padded_labels = np.zeros((self.max_labels, 5))
+        padded_labels[range(len(targets_t))[:self.max_labels]] = targets_t[:self.max_labels]
+        return img, padded_labels
 
 
 class MosaicTransform:

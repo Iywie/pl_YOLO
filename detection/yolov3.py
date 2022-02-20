@@ -6,6 +6,7 @@ import models.necks as NECK
 import models.heads as HEAD
 from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
 from models.evaluators.post_process import coco_post
+from models.evaluators.coco_evaluator_mine import MyEvaluator_step
 
 from torch.optim import Adam, SGD
 from models.lr_scheduler import CosineWarmupScheduler
@@ -41,7 +42,7 @@ class LitYOLOv3(LightningModule):
         # loss parameters
         self.use_l1 = False
         # evaluate parameters
-        self.nms_threshold = 0.65
+        self.nms_threshold = 0.7
         self.confidence_threshold = 0.2
         # dataloader parameters
         self.img_size_train = tuple(self.dataset_cfgs['TRAIN_SIZE'])
@@ -120,22 +121,33 @@ class LitYOLOv3(LightningModule):
             _loss = self.loss[i](output[i])
             pred.append(_loss)
         detections = coco_post(pred, self.num_classes, self.confidence_threshold, self.nms_threshold)
-        detections = convert_to_coco_format(detections, image_id, img_hw, self.img_size_val, self.val_dataset.class_ids)
-        return detections
+        map50_batch, correct, num_gt_batch = MyEvaluator_step(detections, labels, img_hw, image_id, self.img_size_val)
+        print('AP50 of batch %d: %.5f' % (batch_idx, map50_batch))
+        # detections = convert_to_coco_format(detections, image_id, img_hw,
+        #     self.img_size_val, self.val_dataset.class_ids)
+        return correct, num_gt_batch
 
-    def validation_epoch_end(self, validation_step_outputs):
-        detect_list = []
-        for i in range(len(validation_step_outputs)):
-            detect_list += validation_step_outputs[i]
-        ap50_95, ap50, summary = COCOEvaluator(
-            detect_list, self.val_dataset)
-        print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
-        print(summary)
-        self.log("metrics/evaluate/mAP", ap50_95, prog_bar=False)
-        self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
+    def validation_epoch_end(self, results):
+        corrects = 0
+        num_gts = 0
+        for i in range(len(results)):
+            corrects += results[i][0]
+            num_gts += results[i][1]
+        print("Batch {:d}, Mean Average Precision: %.5f" % float(corrects / num_gts))
+
+    # def validation_epoch_end(self, validation_step_outputs):
+    #     detect_list = []
+    #     for i in range(len(validation_step_outputs)):
+    #         detect_list += validation_step_outputs[i]
+    #     ap50_95, ap50, summary = COCOEvaluator(
+    #         detect_list, self.val_dataset)
+    #     print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
+    #     print(summary)
+    #     self.log("metrics/evaluate/mAP", ap50_95, prog_bar=False)
+    #     self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
 
     def configure_optimizers(self):
-        optimizer = SGD(self.parameters(), lr=0.003, momentum=0.9, weight_decay=5e-4)
+        optimizer = SGD(self.parameters(), lr=0.003, momentum=0.9)
         # steps_per_epoch = 1440 // self.train_batch_size
         # self.lr_scheduler = CosineWarmupScheduler(
         #     optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch
@@ -171,7 +183,7 @@ class LitYOLOv3(LightningModule):
             json,
             name="val",
             img_size=self.img_size_val,
-            preprocess=ValTransform(legacy=False),
+            preprocess=ValTransform(legacy=False, max_labels=50,)
         )
         val_loader = DataLoader(self.val_dataset, batch_size=self.val_batch_size, num_workers=4, shuffle=False)
         return val_loader

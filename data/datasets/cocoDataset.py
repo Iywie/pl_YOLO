@@ -67,7 +67,6 @@ class COCODataset(Dataset):
             img, target = self.mosaic
         if self.preprocess is not None:
             img, target = self.preprocess(img, res, self.img_size)
-            img = torch.Tensor(img)
         else:
             target = res
         return img, target, img_hw, np.array([id_]), img_name

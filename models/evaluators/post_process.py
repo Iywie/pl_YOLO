@@ -18,6 +18,7 @@ def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnos
     if isinstance(prediction, list):
         prediction = torch.cat(prediction, 1)
 
+    # from (cx,cy,w,h) to (x1,y1,x2,y2)
     box_corner = prediction.new(prediction.shape)
     box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
     box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
@@ -33,13 +34,12 @@ def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnos
         # If none are remaining => process next image
         if not image_pred.size(0):
             continue
-        # Get score and class with highest confidence
+        # Get score and class with the highest confidence
         class_conf, class_pred = torch.max(image_pred[:, 5: 5 + num_classes], 1, keepdim=True)
-        # Confidence = object possibility multiply class score
-        # conf_mask = (image_pred[:, 4] * class_conf.squeeze() >= conf_thre).squeeze()
         # Detections ordered as (x1, y1, x2, y2, obj_conf, class_conf, class)
         detections = torch.cat((image_pred[:, :5], class_conf, class_pred.float()), 1)
 
+        # NMS processed with class
         unique_labels = detections[:, -1].unique()
         for c in unique_labels:
             # Get the detections with the particular class
@@ -50,7 +50,7 @@ def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnos
             # Perform non-maximum suppression
             max_detections = []
             while detections_class.size(0):
-                # Get detection with highest confidence and save as max detection
+                # Get detection with the highest confidence and save as max detection
                 max_detections.append(detections_class[0].unsqueeze(0))
                 # Stop if we're at the last detection
                 if len(detections_class) == 1:
@@ -60,7 +60,7 @@ def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnos
                 # Remove detections with IoU >= NMS threshold
                 detections_class = detections_class[1:][ious < nms_thre]
 
-            max_detections = torch.cat(max_detections).data
+            max_detections = torch.cat(max_detections)
             # Add max detections to outputs
             output[image_i] = max_detections if output[image_i] is None \
                 else torch.cat((output[image_i], max_detections))
@@ -85,7 +85,6 @@ def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnos
         # # detections = non_max_suppression
         # detections = detections[nms_out_index]
         # output[i] = detections
-
     return output
 
 
@@ -101,8 +100,8 @@ def bbox_iou(box1, box2, x1y1x2y2=True):
         b2_y1, b2_y2 = box2[:, 1] - box2[:, 3] / 2, box2[:, 1] + box2[:, 3] / 2
     else:
         # Get the coordinates of bounding boxes
-        b1_x1, b1_y1, b1_x2, b1_y2 = box1[:,0], box1[:,1], box1[:,2], box1[:,3]
-        b2_x1, b2_y1, b2_x2, b2_y2 = box2[:,0], box2[:,1], box2[:,2], box2[:,3]
+        b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
+        b2_x1, b2_y1, b2_x2, b2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
 
     # get the corrdinates of the intersection rectangle
     inter_rect_x1 =  torch.max(b1_x1, b2_x1)
