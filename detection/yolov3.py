@@ -42,7 +42,7 @@ class LitYOLOv3(LightningModule):
         self.use_l1 = False
         # evaluate parameters
         self.nms_threshold = 0.65
-        self.confidence_threshold = 0.01
+        self.confidence_threshold = 0.2
         # dataloader parameters
         self.img_size_train = tuple(self.dataset_cfgs['TRAIN_SIZE'])
         self.img_size_val = tuple(self.dataset_cfgs['VAL_SIZE'])
@@ -62,7 +62,7 @@ class LitYOLOv3(LightningModule):
         self.perspective = 0.0
         self.enable_mixup = True
         # Training
-        self.warmup = 5
+        self.warmup = 1
 
         self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
@@ -99,8 +99,10 @@ class LitYOLOv3(LightningModule):
         # pred, maps_h, maps_w = self.decoder(output)
         # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOv3Loss(
         #     labels, pred, self.num_classes, self.anchors, self.strides, maps_h, maps_w)
-        self.lr_scheduler.step()
-        self.log("lr", self.lr_scheduler.optimizer.param_groups[0]['lr'], prog_bar=True)
+
+        # self.lr_scheduler.step()
+        # self.log("lr", self.lr_scheduler.optimizer.param_groups[0]['lr'], prog_bar=True)
+
         # self.log("metrics/batch/iou_loss", iou_loss, prog_bar=False)
         # self.log("metrics/batch/l1_loss", l1_loss, prog_bar=False)
         # self.log("metrics/batch/conf_loss", conf_loss, prog_bar=False)
@@ -133,11 +135,11 @@ class LitYOLOv3(LightningModule):
         self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
 
     def configure_optimizers(self):
-        optimizer = SGD(self.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
-        steps_per_epoch = 1440 // self.train_batch_size
-        self.lr_scheduler = CosineWarmupScheduler(
-            optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch
-        )
+        optimizer = SGD(self.parameters(), lr=0.003, momentum=0.9, weight_decay=5e-4)
+        # steps_per_epoch = 1440 // self.train_batch_size
+        # self.lr_scheduler = CosineWarmupScheduler(
+        #     optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch
+        # )
         return optimizer
 
     def train_dataloader(self):

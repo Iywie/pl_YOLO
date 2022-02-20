@@ -56,15 +56,16 @@ class YOLOv3Loss(nn.Module):
                 targets[batch_idx, :num_gt, 4] = percent_y
 
             # mask
-            mask = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False)
-            noobj_mask = torch.ones(batch_size, self.num_anchors, input_h, input_w, requires_grad=False)
+            mask = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False).type_as(prediction)
+            noobj_mask = torch.ones(batch_size, self.num_anchors, input_h, input_w, requires_grad=False).type_as(prediction)
             # target
-            tx = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False)
-            ty = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False)
-            tw = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False)
-            th = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False)
-            tconf = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False)
-            tcls = torch.zeros(batch_size, self.num_anchors, input_h, input_w, self.num_classes, requires_grad=False)
+            tx = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False).type_as(prediction)
+            ty = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False).type_as(prediction)
+            tw = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False).type_as(prediction)
+            th = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False).type_as(prediction)
+            tconf = torch.zeros(batch_size, self.num_anchors, input_h, input_w, requires_grad=False).type_as(prediction)
+            tcls = torch.zeros(batch_size, self.num_anchors, input_h, input_w, self.num_classes, requires_grad=False)\
+                .type_as(prediction)
             for batch_idx in range(batch_size):
                 num_gt = int(nlabel[batch_idx])
                 gt_bboxes_per_image = targets[batch_idx, :num_gt, 1:5]
@@ -80,7 +81,7 @@ class YOLOv3Loss(nn.Module):
                     gi = int(gx)
                     gj = int(gy)
                     # Get shape of gt box
-                    gt_box = torch.FloatTensor(np.array([0, 0, gw, gh])).unsqueeze(0)
+                    gt_box = torch.FloatTensor(np.array([0, 0, gw.cpu(), gh.cpu()])).unsqueeze(0)
                     # Get shape of anchor box
                     anchor_shapes = torch.FloatTensor(
                         np.concatenate((np.zeros((self.num_anchors, 2)), np.array(scaled_anchors)), 1))
@@ -120,9 +121,9 @@ class YOLOv3Loss(nn.Module):
 
         else:
             grid_x = torch.linspace(0, input_w - 1, input_w).repeat(input_w, 1).repeat(batch_size * self.num_anchors, 1,
-                                                                                       1).view(cx.shape)
+                                                                                       1).view(cx.shape).type_as(cx)
             grid_y = torch.linspace(0, input_h - 1, input_h).repeat(input_h, 1).repeat(batch_size * self.num_anchors, 1,
-                                                                                       1).view(cy.shape)
+                                                                                       1).view(cy.shape).type_as(cy)
             # Calculate anchor w, h
             anchor_w = torch.tensor(scaled_anchors).index_select(1, torch.tensor([0])).type_as(prediction)
             anchor_h = torch.tensor(scaled_anchors).index_select(1, torch.tensor([1])).type_as(prediction)
@@ -135,7 +136,7 @@ class YOLOv3Loss(nn.Module):
             h = torch.exp(h) * anchor_h
             pred_bboxes = torch.cat((cx, cy, w, h), -1)
 
-            _scale = torch.Tensor([stride_w, stride_h] * 2)
+            _scale = torch.Tensor([stride_w, stride_h] * 2).type_as(pred_bboxes)
             output = torch.cat((pred_bboxes.view(batch_size, -1, 4) * _scale, conf.view(batch_size, -1, 1),
                                 pred_cls.view(batch_size, -1, self.num_classes)), -1)
 
