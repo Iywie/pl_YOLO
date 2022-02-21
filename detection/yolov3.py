@@ -68,11 +68,11 @@ class LitYOLOv3(LightningModule):
         self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
         self.head = HEAD.DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
+        # self.head.initialize_biases(1e-2)
         # self.decoder = HEAD.YOLOv3Decoder(self.num_classes, n_anchors, self.anchors, self.strides)
         self.loss = []
         for i in range(3):
             self.loss.append(HEAD.YOLOv3Loss(self.anchors[i], self.num_classes, self.img_size_train))
-        self.head.initialize_biases(1e-2)
 
     def forward(self, x):
         return x
@@ -133,7 +133,7 @@ class LitYOLOv3(LightningModule):
         for i in range(len(results)):
             corrects += results[i][0]
             num_gts += results[i][1]
-        print("Batch {:d}, Mean Average Precision: %.5f" % float(corrects / num_gts))
+        print("Mean Average Precision: %.5f" % float(corrects / num_gts))
 
     # def validation_epoch_end(self, validation_step_outputs):
     #     detect_list = []
