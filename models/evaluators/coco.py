@@ -45,8 +45,10 @@ def convert_to_coco_format(outputs, ids, hws, val_size, class_ids):
         bboxes /= scale
         bboxes = xyxy2xywh(bboxes)
 
-        cls = output[:, 6]
-        scores = output[:, 4] * output[:, 5]
+        # cls = output[:, 6]
+        # scores = output[:, 4] * output[:, 5]
+        cls = output[:, 5]
+        scores = output[:, 4]
         for ind in range(bboxes.shape[0]):
             label = class_ids[int(cls[ind])]
             pred_data = {

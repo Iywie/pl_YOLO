@@ -50,9 +50,9 @@ def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnos
             # Perform non-maximum suppression
             max_detections = []
             while detections_class.size(0):
-                # Get detection with the highest confidence and save as max detection
+                # Get lightning with the highest confidence and save as max lightning
                 max_detections.append(detections_class[0].unsqueeze(0))
-                # Stop if we're at the last detection
+                # Stop if we're at the last lightning
                 if len(detections_class) == 1:
                     break
                 # Get the IOUs for all boxes with lower confidence
@@ -104,13 +104,13 @@ def bbox_iou(box1, box2, x1y1x2y2=True):
         b2_x1, b2_y1, b2_x2, b2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
 
     # get the corrdinates of the intersection rectangle
-    inter_rect_x1 =  torch.max(b1_x1, b2_x1)
-    inter_rect_y1 =  torch.max(b1_y1, b2_y1)
-    inter_rect_x2 =  torch.min(b1_x2, b2_x2)
-    inter_rect_y2 =  torch.min(b1_y2, b2_y2)
+    inter_rect_x1 = torch.max(b1_x1, b2_x1)
+    inter_rect_y1 = torch.max(b1_y1, b2_y1)
+    inter_rect_x2 = torch.min(b1_x2, b2_x2)
+    inter_rect_y2 = torch.min(b1_y2, b2_y2)
     # Intersection area
     inter_area = torch.clamp(inter_rect_x2 - inter_rect_x1 + 1, min=0) * \
-                    torch.clamp(inter_rect_y2 - inter_rect_y1 + 1, min=0)
+                 torch.clamp(inter_rect_y2 - inter_rect_y1 + 1, min=0)
     # Union Area
     b1_area = (b1_x2 - b1_x1 + 1) * (b1_y2 - b1_y1 + 1)
     b2_area = (b2_x2 - b2_x1 + 1) * (b2_y2 - b2_y1 + 1)

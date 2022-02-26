@@ -58,7 +58,7 @@ class COCODataset(Dataset):
 
         # Read annotation from self
         id_ = self.ids[index]
-        res, img_hw, resized_info, img_name = self.annotations[id_]
+        res, img_hw, resized_info, img_name = self.annotations[index]
         # load image from file
         img = self.load_resized_img(index)
 
@@ -102,7 +102,7 @@ class COCODataset(Dataset):
         res[:, :4] *= r
 
         img_hw = (height, width)
-        resized_info = (int(height * r), int(width * r))
+        resized_hw = (int(height * r), int(width * r))
 
         file_name = (
             im_ann["file_name"]
@@ -110,7 +110,7 @@ class COCODataset(Dataset):
             else "{:012}".format(id) + ".jpg"
         )
 
-        return res, img_hw, resized_info, file_name
+        return res, img_hw, resized_hw, file_name
 
     def load_resized_img(self, index):
         img = self.load_image(index)

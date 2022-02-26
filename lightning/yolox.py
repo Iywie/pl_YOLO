@@ -6,6 +6,7 @@ import models.backbones as BACKBONE
 import models.necks as NECK
 import models.heads as HEAD
 from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
+from models.evaluators.coco_evaluator_mine import MyEvaluator_step
 from models.evaluators.post_process import coco_post
 
 from torch.optim import Adam, SGD
@@ -95,20 +96,29 @@ class LitYOLOX(LightningModule):
         output = self.head(output)
         pred = self.decoder(output)
         detections = coco_post(pred, self.num_classes, self.confidence_threshold, self.nms_threshold)
-        detections = convert_to_coco_format(detections, image_id, img_hw, self.img_size_val, self.val_dataset.class_ids)
-        return detections
+        map50_batch, correct, num_gt_batch = MyEvaluator_step(detections, labels, img_hw, image_id, self.img_size_val)
+        print('AP50 of batch %d: %.5f' % (batch_idx, map50_batch))
+        return correct, num_gt_batch
+        # detections = convert_to_coco_format(detections, image_id, img_hw, self.img_size_val, self.val_dataset.class_ids)
+        # return detections
 
-    def validation_epoch_end(self, validation_step_outputs):
-        detect_list = []
-        for i in range(len(validation_step_outputs)):
-            detect_list += validation_step_outputs[i]
-        ap50_95, ap50, summary = COCOEvaluator(
-            detect_list, self.val_dataset)
-        print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
-        print(summary)
-        self.log("metrics/evaluate/mAP", ap50_95, prog_bar=False)
-        self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
-        # self.log("metrics/evaluate/summary", summary, prog_bar=False)
+    def validation_epoch_end(self, results):
+        corrects = 0
+        num_gts = 0
+        for i in range(len(results)):
+            corrects += results[i][0]
+            num_gts += results[i][1]
+        print("Epoch:%d: Average Precision = %.5f" % (self.current_epoch, float(corrects / num_gts)))
+    # def validation_epoch_end(self, validation_step_outputs):
+    #     detect_list = []
+    #     for i in range(len(validation_step_outputs)):
+    #         detect_list += validation_step_outputs[i]
+    #     ap50_95, ap50, summary = COCOEvaluator(
+    #         detect_list, self.val_dataset)
+    #     print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
+    #     print(summary)
+    #     self.log("metrics/evaluate/mAP", ap50_95, prog_bar=False)
+    #     self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
 
     def configure_optimizers(self):
         optimizer = SGD(self.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)

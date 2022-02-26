@@ -9,7 +9,7 @@ def default_argument_parser():
         argparse.ArgumentParser:
     """
 
-    parser = argparse.ArgumentParser("Joseph's detection")
+    parser = argparse.ArgumentParser("Joseph's lightning")
 
     parser.add_argument("-n", "--experiment-name", type=str)
     parser.add_argument('--cfg', type=str, default='', help='model.yaml path')

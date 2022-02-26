@@ -43,7 +43,7 @@ class YOLOv3Loss(nn.Module):
 
         if targets is not None:
             nlabel = (targets.sum(dim=2) > 0).sum(dim=1)
-            # From [cx, cy, w, h] to [x1%, y1%, x2%, y2%]
+            # From [cx, cy, w, h] to [cx%, cy%, w%, h%]
             for batch_idx in range(batch_size):
                 num_gt = int(nlabel[batch_idx])
                 percent_cx = targets[batch_idx, :num_gt, 1] / self.img_size[0]
@@ -86,7 +86,7 @@ class YOLOv3Loss(nn.Module):
                     anchor_shapes = torch.FloatTensor(
                         np.concatenate((np.zeros((self.num_anchors, 2)), np.array(scaled_anchors)), 1))
                     # Calculate iou between gt and anchor shapes
-                    anch_ious = bbox_iou(gt_box, anchor_shapes)
+                    anch_ious = bbox_iou(gt_box, anchor_shapes, x1y1x2y2=False)
                     # Where the overlap is larger than threshold set mask to zero (ignore)
                     noobj_mask[batch_idx, anch_ious > self.ignore_threshold, gj, gi] = 0
                     # Find the best matching anchor box

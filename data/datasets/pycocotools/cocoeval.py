@@ -9,7 +9,7 @@ import copy
 
 
 class COCOeval:
-    # Interface for evaluating detection on the Microsoft COCO dataset.
+    # Interface for evaluating lightning on the Microsoft COCO dataset.
     #
     # The usage for CocoEval is as follows:
     #  cocoGt=..., cocoDt=...       # load dataset and results
@@ -62,7 +62,7 @@ class COCOeval:
         '''
         Initialize CocoEval using coco APIs for gt and dt
         :param cocoGt: coco object with ground truth annotations
-        :param cocoDt: coco object with detection results
+        :param cocoDt: coco object with lightning results
         :return: None
         '''
         if not iouType:
@@ -144,7 +144,7 @@ class COCOeval:
         self.params = p
 
         self._prepare()
-        # loop through images, area range, max detection number
+        # loop through images, area range, max lightning number
         catIds = p.catIds if p.useCats else [-1]
 
         if p.iouType == 'segm' or p.iouType == 'bbox':
@@ -209,7 +209,7 @@ class COCOeval:
         sigmas = p.kpt_oks_sigmas
         vars = (sigmas * 2) ** 2
         k = len(sigmas)
-        # compute oks between each detection and ground truth object
+        # compute oks between each lightning and ground truth object
         for j, gt in enumerate(gts):
             # create bounds for ignore regions(double the gt bbox)
             g = np.array(gt['keypoints'])

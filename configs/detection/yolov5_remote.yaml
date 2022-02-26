@@ -1,0 +1,32 @@
+# Parameters
+
+CSPDARKNET:
+    DEPTH: 0.5
+    INPUT_CHANNELS: [32, 64, 128, 256, 512] # five blocks
+    OUT_FEATURES: ["dark3", "dark4", "dark5"]
+    NORM: "bn"
+    ACT: "silu"
+
+PAFPN:
+    DEPTH: 0.5
+    INPUT_CHANNELS: [128, 256, 512]
+    NORM: "bn"
+    ACT: "silu"
+
+DECOUPLEDHEAD:
+    CLASSES: 6
+
+DECODER:
+    ANCHORS: [[[116, 90], [156, 198], [373, 326]],
+              [[30, 61], [62, 45], [59, 119]],
+              [[10, 13], [16, 30], [33, 23]]]
+
+DATASET:
+    DIR: '/root/autodl-tmp/COCO'
+    TRAIN_JSON: 'train.json'
+    VAL_JSON: 'val.json'
+    TEST_JSON: 'val.json'
+    TRAIN_SIZE: [416,416]
+    VAL_SIZE: [416,416]
+    TRAIN_BATCH_SIZE: 32
+    VAL_BATCH_SIZE: 32

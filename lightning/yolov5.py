@@ -4,16 +4,18 @@ from data import TrainTransform, ValTransform
 import models.backbones as BACKBONE
 import models.necks as NECK
 import models.heads as HEAD
+from models.heads.yolov5.yolov5_loss import YOLOv5Loss
+from models.heads.yolov5.yolov5_decoder import YOLOv5Decoder
 from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
 from models.evaluators.post_process import coco_post
+from models.evaluators.nms_2 import non_max_suppression
 from models.evaluators.coco_evaluator_mine import MyEvaluator_step
 
 from torch.optim import Adam, SGD
 from models.lr_scheduler import CosineWarmupScheduler
 
 
-class LitYOLOv3(LightningModule):
-
+class LitYOLOv5(LightningModule):
     def __init__(self, cfgs):
         super().__init__()
         self.backbone_cfgs = cfgs['CSPDARKNET']
@@ -41,6 +43,8 @@ class LitYOLOv3(LightningModule):
         self.strides = [8, 16, 32]
         # loss parameters
         self.use_l1 = False
+        anchor_thre = 4.0
+        balance = [4.0, 1.0, 0.4]
         # evaluate parameters
         self.nms_threshold = 0.7
         self.confidence_threshold = 0.2
@@ -50,108 +54,47 @@ class LitYOLOv3(LightningModule):
         self.train_batch_size = self.dataset_cfgs['TRAIN_BATCH_SIZE']
         self.val_batch_size = self.dataset_cfgs['VAL_BATCH_SIZE']
         self.val_dataset = None
-        # --------------- transform config ----------------- #
-        self.mosaic_prob = 1.0
-        self.mixup_prob = 1.0
-        self.hsv_prob = 1.0
-        self.flip_prob = 0.5
-        self.degrees = 10.0
-        self.translate = 0.1
-        self.mosaic_scale = (0.1, 2)
-        self.mixup_scale = (0.5, 1.5)
-        self.shear = 2.0
-        self.perspective = 0.0
-        self.enable_mixup = True
-        # Training
-        self.warmup = 1
-
+        # Training parameters
+        self.warmup = 3
+        # Model
         self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
         self.head = HEAD.DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
-        # self.head.initialize_biases(1e-2)
-        # self.decoder = HEAD.YOLOv3Decoder(self.num_classes, n_anchors, self.anchors, self.strides)
-        self.loss = []
-        for i in range(3):
-            self.loss.append(HEAD.YOLOv3Loss(self.anchors[i], self.num_classes, self.img_size_train))
-
-    def forward(self, x):
-        return x
+        self.loss = YOLOv5Loss(self.num_classes, self.img_size_train, self.anchors, self.strides,
+                               anchor_thre, balance)
+        self.decoder = YOLOv5Decoder(self.num_classes, self.anchors, self.strides)
 
     def training_step(self, batch, batch_idx):
         imgs, labels, _, _, _ = batch
         output = self.backbone(imgs)
         output = self.neck(output)
         output = self.head(output)
-        loss = 0
-        for i in range(len(output)):
-            _loss = self.loss[i](output[i], labels)
-            loss += _loss
-        # losses_name = ["total_loss", "x", "y", "w", "h", "conf", "cls"]
-        # losses = []
-        # for _ in range(len(losses_name)):
-        #     losses.append([])
-        # for i in range(3):
-        #     _loss_item = self.loss[i](output[i], labels)
-        #     for j, l in enumerate(_loss_item):
-        #         losses[j].append(l)
-        # losses = [sum(l) for l in losses]
-        # loss = losses[0]
-
-        # pred, maps_h, maps_w = self.decoder(output)
-        # loss, iou_loss, conf_loss, cls_loss, l1_loss, num_fg = HEAD.YOLOv3Loss(
-        #     labels, pred, self.num_classes, self.anchors, self.strides, maps_h, maps_w)
-
-        # self.lr_scheduler.step()
-        # self.log("lr", self.lr_scheduler.optimizer.param_groups[0]['lr'], prog_bar=True)
-
-        # self.log("metrics/batch/iou_loss", iou_loss, prog_bar=False)
-        # self.log("metrics/batch/l1_loss", l1_loss, prog_bar=False)
-        # self.log("metrics/batch/conf_loss", conf_loss, prog_bar=False)
-        # self.log("metrics/batch/cls_loss", cls_loss, prog_bar=False)
-        # self.log("metrics/batch/num_fg", num_fg, prog_bar=False)
+        loss, _ = self.loss(output, labels)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        imgs, labels, img_hw, image_id, img_name = batch
+        imgs, _, img_hw, image_id, img_name = batch
         output = self.backbone(imgs)
         output = self.neck(output)
         output = self.head(output)
-        pred = []
-        for i in range(len(output)):
-            _loss = self.loss[i](output[i])
-            pred.append(_loss)
-        detections = coco_post(pred, self.num_classes, self.confidence_threshold, self.nms_threshold)
-        map50_batch, correct, num_gt_batch = MyEvaluator_step(detections, labels, img_hw, image_id, self.img_size_val)
-        print('AP50 of batch %d: %.5f' % (batch_idx, map50_batch))
-        # detections = convert_to_coco_format(detections, image_id, img_hw,
-        #     self.img_size_val, self.val_dataset.class_ids)
-        return correct, num_gt_batch
+        predictions = self.decoder(output)
+        # predictions = predictions.cpu()
+        detections = non_max_suppression(predictions, self.confidence_threshold, self.nms_threshold, multi_label=True)
+        # detections = coco_post(predictions, self.num_classes, self.confidence_threshold, self.nms_threshold)
+        detections = convert_to_coco_format(detections, image_id, img_hw,
+                                            self.img_size_val, self.val_dataset.class_ids)
+        return detections
 
     def validation_epoch_end(self, results):
-        corrects = 0
-        num_gts = 0
+        detect_list = []
         for i in range(len(results)):
-            corrects += results[i][0]
-            num_gts += results[i][1]
-        print("Mean Average Precision: %.5f" % float(corrects / num_gts))
-
-    # def validation_epoch_end(self, validation_step_outputs):
-    #     detect_list = []
-    #     for i in range(len(validation_step_outputs)):
-    #         detect_list += validation_step_outputs[i]
-    #     ap50_95, ap50, summary = COCOEvaluator(
-    #         detect_list, self.val_dataset)
-    #     print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
-    #     print(summary)
-    #     self.log("metrics/evaluate/mAP", ap50_95, prog_bar=False)
-    #     self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
+            detect_list += results[i]
+        ap50_95, ap50, summary = COCOEvaluator(
+            detect_list, self.val_dataset)
+        print(summary)
 
     def configure_optimizers(self):
-        optimizer = SGD(self.parameters(), lr=0.003, momentum=0.9)
-        # steps_per_epoch = 1440 // self.train_batch_size
-        # self.lr_scheduler = CosineWarmupScheduler(
-        #     optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch
-        # )
+        optimizer = SGD(self.parameters(), lr=0.003, momentum=0.9, weight_decay=4e-05)
         return optimizer
 
     def train_dataloader(self):
@@ -183,7 +126,8 @@ class LitYOLOv3(LightningModule):
             json,
             name="val",
             img_size=self.img_size_val,
-            preprocess=ValTransform(legacy=False, max_labels=50,)
+            preprocess=ValTransform(legacy=False, max_labels=50, )
         )
         val_loader = DataLoader(self.val_dataset, batch_size=self.val_batch_size, num_workers=4, shuffle=False)
         return val_loader
+
