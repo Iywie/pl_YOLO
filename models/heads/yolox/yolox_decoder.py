@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torchvision
 
 
 class YOLOXDecoder(nn.Module):
@@ -14,11 +15,8 @@ class YOLOXDecoder(nn.Module):
         self.strides = strides
         self.grids = [torch.zeros(1)] * len(strides)
 
-    def forward(self, inputs):
+    def forward(self, inputs, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
         preds = []
-        x_shifts = []
-        y_shifts = []
-        expanded_strides = []
         batch_size = inputs[0].shape[0]
         n_ch = 4 + 1 + self.n_anchors * self.num_classes  # the channel of one ground truth prediction.
 
@@ -36,11 +34,6 @@ class YOLOXDecoder(nn.Module):
                 self.grids[i] = grid
             else:
                 grid = self.grids[i]
-            x_shifts.append(grid[:, :, 0])
-            y_shifts.append(grid[:, :, 1])
-            expanded_strides.append(
-                torch.zeros(1, grid.shape[1]).fill_(self.strides[i]).type_as(pred)
-            )
 
             pred = pred.view(batch_size, self.n_anchors, n_ch, h, w)
             pred = pred.permute(0, 1, 3, 4, 2).reshape(
@@ -53,9 +46,52 @@ class YOLOXDecoder(nn.Module):
             preds.append(pred)
 
         # preds: [batch_size, all predictions, n_ch]
-        preds = torch.cat(preds, 1)
-        if self.training:
-            return preds, x_shifts, y_shifts, expanded_strides
-        else:
-            return preds
+        predictions = torch.cat(preds, 1)
+
+        # from (cx,cy,w,h) to (x1,y1,x2,y2)
+        box_corner = predictions.new(predictions.shape)
+        box_corner[:, :, 0] = predictions[:, :, 0] - predictions[:, :, 2] / 2
+        box_corner[:, :, 1] = predictions[:, :, 1] - predictions[:, :, 3] / 2
+        box_corner[:, :, 2] = predictions[:, :, 0] + predictions[:, :, 2] / 2
+        box_corner[:, :, 3] = predictions[:, :, 1] + predictions[:, :, 3] / 2
+        predictions[:, :, :4] = box_corner[:, :, :4]
+
+        output = [None for _ in range(len(predictions))]
+        for i, image_pred in enumerate(predictions):
+
+            # If none are remaining => process next image
+            if not image_pred.size(0):
+                continue
+            # Get score and class with highest confidence
+            class_conf, class_pred = torch.max(image_pred[:, 5: 5 + self.num_classes], 1, keepdim=True)
+
+            conf_mask = (image_pred[:, 4] * class_conf.squeeze() >= conf_thre).squeeze()
+            # Detections ordered as (x1, y1, x2, y2, obj_conf, class_conf, class_pred)
+            detections = torch.cat((image_pred[:, :5], class_conf, class_pred.float()), 1)
+            detections = detections[conf_mask]
+            if not detections.size(0):
+                continue
+
+            if class_agnostic:
+                nms_out_index = torchvision.ops.nms(
+                    detections[:, :4],
+                    detections[:, 4] * detections[:, 5],
+                    nms_thre,
+                )
+            else:
+                nms_out_index = torchvision.ops.batched_nms(
+                    detections[:, :4],
+                    detections[:, 4] * detections[:, 5],
+                    detections[:, 6],
+                    nms_thre,
+                )
+
+            detections = detections[nms_out_index]
+            # output[i] = detections
+            if output[i] is None:
+                output[i] = detections
+            else:
+                output[i] = torch.cat((output[i], detections))
+
+        return output
 

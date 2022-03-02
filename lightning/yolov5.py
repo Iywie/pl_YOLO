@@ -1,18 +1,16 @@
 from pytorch_lightning import LightningModule
 
-from data import TrainTransform, ValTransform
+from models.data.datasets.cocoDataset import COCODataset
+from torch.utils.data.dataloader import DataLoader
+from models.data.data_augments import TrainTransform, ValTransform
 import models.backbones as BACKBONE
 import models.necks as NECK
 import models.heads as HEAD
 from models.heads.yolov5.yolov5_loss import YOLOv5Loss
 from models.heads.yolov5.yolov5_decoder import YOLOv5Decoder
 from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
-from models.evaluators.post_process import coco_post
 from models.evaluators.nms_2 import non_max_suppression
-from models.evaluators.coco_evaluator_mine import MyEvaluator_step
-
-from torch.optim import Adam, SGD
-from models.lr_scheduler import CosineWarmupScheduler
+from torch.optim import SGD
 
 
 class LitYOLOv5(LightningModule):
@@ -47,8 +45,11 @@ class LitYOLOv5(LightningModule):
         balance = [4.0, 1.0, 0.4]
         # evaluate parameters
         self.nms_threshold = 0.7
-        self.confidence_threshold = 0.2
+        self.confidence_threshold = 0.01
         # dataloader parameters
+        self.data_dir = self.dataset_cfgs['DIR']
+        self.train_dir = self.dataset_cfgs['TRAIN']
+        self.val_dir = self.dataset_cfgs['VAL']
         self.img_size_train = tuple(self.dataset_cfgs['TRAIN_SIZE'])
         self.img_size_val = tuple(self.dataset_cfgs['VAL_SIZE'])
         self.train_batch_size = self.dataset_cfgs['TRAIN_BATCH_SIZE']
@@ -78,9 +79,7 @@ class LitYOLOv5(LightningModule):
         output = self.neck(output)
         output = self.head(output)
         predictions = self.decoder(output)
-        # predictions = predictions.cpu()
         detections = non_max_suppression(predictions, self.confidence_threshold, self.nms_threshold, multi_label=True)
-        # detections = coco_post(predictions, self.num_classes, self.confidence_threshold, self.nms_threshold)
         detections = convert_to_coco_format(detections, image_id, img_hw,
                                             self.img_size_val, self.val_dataset.class_ids)
         return detections
@@ -94,18 +93,13 @@ class LitYOLOv5(LightningModule):
         print(summary)
 
     def configure_optimizers(self):
-        optimizer = SGD(self.parameters(), lr=0.003, momentum=0.9, weight_decay=4e-05)
+        optimizer = SGD(self.parameters(), lr=0.01, momentum=0.9, weight_decay=4e-05)
         return optimizer
 
     def train_dataloader(self):
-        from data.datasets.cocoDataset import COCODataset
-        from torch.utils.data.dataloader import DataLoader
-        data_dir = self.dataset_cfgs['DIR']
-        json = self.dataset_cfgs['TRAIN_JSON']
         dataset = COCODataset(
-            data_dir,
-            json,
-            name='train',
+            self.data_dir,
+            name=self.train_dir,
             img_size=self.img_size_train,
             preprocess=TrainTransform(
                 max_labels=50,
@@ -117,14 +111,9 @@ class LitYOLOv5(LightningModule):
         return train_loader
 
     def val_dataloader(self):
-        from data.datasets.cocoDataset import COCODataset
-        from torch.utils.data.dataloader import DataLoader
-        data_dir = self.dataset_cfgs['DIR']
-        json = self.dataset_cfgs['VAL_JSON']
         self.val_dataset = COCODataset(
-            data_dir,
-            json,
-            name="val",
+            self.dataset_cfgs['DIR'],
+            name=self.val_dir,
             img_size=self.img_size_val,
             preprocess=ValTransform(legacy=False, max_labels=50, )
         )

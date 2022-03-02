@@ -15,24 +15,32 @@ class YOLOv5Loss:
 
         self.gr = 1.0
 
-        self.BCEcls = nn.BCEWithLogitsLoss()
-        self.BCEobj = nn.BCEWithLogitsLoss()
+        self.BCEcls = None
+        self.BCEobj = None
+        self.cn = 0.0  # class negative
+        self.pn = 1.0  # class positive
         self.lambda_box = 0.05
         self.lambda_obj = 1.0
         self.lambda_cls = 0.0375
 
-    def __call__(self, inputs, targets=None):
+    def __call__(self, inputs, targets):
         """
         :param inputs: a list of feature maps
         :param targets: (bs, max_label, 5)
         :return:
         """
+        if self.BCEobj is None:
+            self.BCEcls = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([1.0]).type_as(targets))
+            self.BCEobj = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([1.0]).type_as(targets))
         nl = len(inputs)    # number of layers
         na = len(self.anchors[0])   # number of anchors, every layer have the same number of anchors
         n_gt = (targets.sum(dim=2) > 0).sum(dim=1)
         nts = n_gt.sum()  # number of ground truths of the batch
         bs = targets.shape[0]
-        lcls = lbox = lobj = torch.zeros(1).type_as(targets)
+        lbox = torch.zeros(1).type_as(targets)
+        lobj = torch.zeros(1).type_as(targets)
+        lcls = torch.zeros(1).type_as(targets)
+
         for i in range(nl):
             prediction = inputs[i].view(bs, na, 5+self.num_classes, inputs[i].size(2), inputs[i].size(3)) \
                 .permute(0, 1, 3, 4, 2).contiguous()
@@ -124,8 +132,8 @@ class YOLOv5Loss:
 
                 # Classification
                 if self.num_classes > 1:  # cls loss (only if multiple classes)
-                    t = torch.full_like(ps[:, 5:], self.num_classes).type_as(pi)  # targets
-                    t[range(n), tcls[i]] = 1
+                    t = torch.full_like(ps[:, 5:], self.cn).type_as(pi)  # targets
+                    t[range(n), tcls[i]] = self.pn
                     lcls += self.BCEcls(ps[:, 5:], t)  # BCE
 
             obji = self.BCEobj(pi[..., 4], tobj)

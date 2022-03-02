@@ -1,14 +1,15 @@
 from pytorch_lightning import LightningModule
 
-from data import TrainTransform, ValTransform
 import models.backbones as BACKBONE
 import models.necks as NECK
 import models.heads as HEAD
 from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
 from models.evaluators.post_process import coco_post
-from models.evaluators.coco_evaluator_mine import MyEvaluator_step
 
-from torch.optim import Adam, SGD
+from models.data.datasets.cocoDataset import COCODataset
+from torch.utils.data.dataloader import DataLoader
+from models.data.data_augments import TrainTransform, ValTransform
+from torch.optim import SGD
 from models.lr_scheduler import CosineWarmupScheduler
 
 
@@ -37,7 +38,6 @@ class LitYOLOv3(LightningModule):
         # decoder parameters
         self.anchors = self.decoder_cfgs['ANCHORS']
         n_anchors = len(self.anchors)
-        # anchors_mask = self.decoder_cfgs['ANCHORS_MASK']
         self.strides = [8, 16, 32]
         # loss parameters
         self.use_l1 = False
@@ -45,6 +45,9 @@ class LitYOLOv3(LightningModule):
         self.nms_threshold = 0.7
         self.confidence_threshold = 0.2
         # dataloader parameters
+        self.data_dir = self.dataset_cfgs['DIR']
+        self.train_dir = self.dataset_cfgs['TRAIN']
+        self.val_dir = self.dataset_cfgs['VAL']
         self.img_size_train = tuple(self.dataset_cfgs['TRAIN_SIZE'])
         self.img_size_val = tuple(self.dataset_cfgs['VAL_SIZE'])
         self.train_batch_size = self.dataset_cfgs['TRAIN_BATCH_SIZE']
@@ -56,8 +59,6 @@ class LitYOLOv3(LightningModule):
         self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
         self.head = HEAD.DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
-        # self.head.initialize_biases(1e-2)
-        # self.decoder = HEAD.YOLOv3Decoder(self.num_classes, n_anchors, self.anchors, self.strides)
         self.loss = []
         for i in range(3):
             self.loss.append(HEAD.YOLOv3Loss(self.anchors[i], self.num_classes, self.img_size_train))
@@ -109,7 +110,7 @@ class LitYOLOv3(LightningModule):
         print(summary)
 
     def configure_optimizers(self):
-        optimizer = SGD(self.parameters(), lr=0.0001, momentum=0.9, weight_decay=4e-05)
+        optimizer = SGD(self.parameters(), lr=0.001, momentum=0.9, weight_decay=4e-05)
         steps_per_epoch = 1440 // self.train_batch_size
         self.lr_scheduler = CosineWarmupScheduler(
             optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch
@@ -117,14 +118,9 @@ class LitYOLOv3(LightningModule):
         return optimizer
 
     def train_dataloader(self):
-        from data.datasets.cocoDataset import COCODataset
-        from torch.utils.data.dataloader import DataLoader
-        data_dir = self.dataset_cfgs['DIR']
-        json = self.dataset_cfgs['TRAIN_JSON']
         dataset = COCODataset(
-            data_dir,
-            json,
-            name='train',
+            self.data_dir,
+            name=self.train_dir,
             img_size=self.img_size_train,
             preprocess=TrainTransform(
                 max_labels=50,
@@ -136,16 +132,11 @@ class LitYOLOv3(LightningModule):
         return train_loader
 
     def val_dataloader(self):
-        from data.datasets.cocoDataset import COCODataset
-        from torch.utils.data.dataloader import DataLoader
-        data_dir = self.dataset_cfgs['DIR']
-        json = self.dataset_cfgs['VAL_JSON']
         self.val_dataset = COCODataset(
-            data_dir,
-            json,
-            name="train",
+            self.data_dir,
+            name=self.val_dir,
             img_size=self.img_size_val,
-            preprocess=ValTransform(legacy=False, max_labels=50, )
+            preprocess=ValTransform(legacy=False, max_labels=50)
         )
         val_loader = DataLoader(self.val_dataset, batch_size=self.val_batch_size, num_workers=4, shuffle=False)
         return val_loader

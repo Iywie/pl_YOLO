@@ -96,32 +96,6 @@ class ValTransform:
         return img, padded_labels
 
 
-class MosaicTransform:
-    def __init__(self, degrees=10.0, translate=0.1, mosaic_scale=(0.5, 1.5), mixup_scale=(0.5, 1.5),
-                 shear=2.0, perspective=0.0, enable_mixup=True, mosaic_prob=1.0, mixup_prob=1.0):
-        self.degrees = degrees
-        self.translate = translate
-        self.scale = mosaic_scale
-        self.shear = shear
-        self.perspective = perspective
-        self.mixup_scale = mixup_scale
-        self.enable_mixup = enable_mixup
-        self.mosaic_prob = mosaic_prob
-        self.mixup_prob = mixup_prob
-
-    def __call__(self, image, targets, input_dim):
-        if random.random() < self.mosaic_prob:
-            mosaic_labels = []
-            input_h, input_w = input_dim[0], input_dim[1]
-
-            # yc, xc = s, s  # mosaic center x, y
-            yc = int(random.uniform(0.5 * input_h, 1.5 * input_h))
-            xc = int(random.uniform(0.5 * input_w, 1.5 * input_w))
-
-            # 3 additional image indices
-            indices = [idx] + [random.randint(0, len(self._dataset) - 1) for _ in range(3)]
-
-
 def preproc(img, input_size, swap=(2, 0, 1)):
     if len(img.shape) == 3:
         padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114

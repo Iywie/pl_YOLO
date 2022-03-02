@@ -1,8 +1,7 @@
 import os
 import cv2
-import torch
 import numpy as np
-from data.datasets.pycocotools.coco import COCO
+from models.data.datasets.pycocotools.coco import COCO
 from torch.utils.data.dataset import Dataset
 
 
@@ -11,28 +10,25 @@ class COCODataset(Dataset):
         COCO dataset initialization. Annotation data are read into memory by COCO API.
         Args:
             data_dir (str): dataset root directory
-            json_file (str): COCO json file name
             name (str): COCO data name (e.g. 'train2017' or 'val2017')
             img_size (tuple): target image size after pre-processing
             preprocess: data augmentation strategy
+            mosaic(bool):
         """
 
-    def __init__(
-            self,
-            data_dir=None,
-            json_file="train.json",
-            name="train",
-            img_size=(416, 416),
-            preprocess=None,
-            mosaic=None,
-    ):
+    def __init__(self,
+                 data_dir,
+                 name,
+                 img_size,
+                 preprocess=None,
+                 mosaic=False,
+                 ):
         super().__init__()
         self.data_dir = data_dir
-        self.json_file = json_file
         self.name = name
         self.img_size = img_size
         self.preprocess = preprocess
-        self.mosaic = mosaic
+        self.json_file = name + ".json"
 
         self.coco = COCO(os.path.join(self.data_dir, "annotations", self.json_file))
         self.ids = self.coco.getImgIds()
@@ -62,9 +58,6 @@ class COCODataset(Dataset):
         # load image from file
         img = self.load_resized_img(index)
 
-        # Mosaic transform
-        if self.mosaic is not None:
-            img, target = self.mosaic
         if self.preprocess is not None:
             img, target = self.preprocess(img, res, self.img_size)
         else:

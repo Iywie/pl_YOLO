@@ -1,26 +1,32 @@
 # Parameters
 
+backbone:
+    name: "cspdarknet"
+    depth: 0.5
+    input_channels: [32, 64, 128, 256, 512] # five blocks
+    output_features: ["dark3", "dark4", "dark5"]
+    normalization: "bn"
+    activation: "silu"
+neck:
+    name: "pafpn"
+    depth: 0.5
+    input_channels: [128, 256, 512]
+    normalization: "bn"
+    activation: "silu"
+head:
+    name: "decoupled_head"
+    classes: 6
 
-CSPDARKNET:
-    DEPTH: 0.5
-    INPUT_CHANNELS: [32, 64, 128, 256, 512] # five blocks
-    OUT_FEATURES: ["dark3", "dark4", "dark5"]
-    NORM: "bn"
-    ACT: "silu"
-PAFPN:
-    DEPTH: 0.5
-    INPUT_CHANNELS: [128, 256, 512]
-    NORM: "bn"
-    ACT: "silu"
-YOLOXHEAD:
-    CLASSES: 6
-
-DATASET:
-    DIR: '/content/drive/MyDrive/COCO'
-    TRAIN_JSON: 'train.json'
-    VAL_JSON: 'val.json'
-    TEST_JSON: 'test.json'
+dataset:
+    dir: '/content/drive/MyDrive/COCO'
+    train: 'train'  # directory name of training image
+    val: 'val'
+    test: 'test'
     TRAIN_SIZE: [224,224]
     VAL_SIZE: [224,224]
     TRAIN_BATCH_SIZE: 64
     VAL_BATCH_SIZE: 64
+
+transform:
+    mosaic_epoch: 200
+

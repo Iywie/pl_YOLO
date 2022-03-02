@@ -1,157 +1,199 @@
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.losses import bboxes_iou, ciou_loss, IOUloss
 
 
-def YOLOXLoss(labels, outputs,
-              x_shifts, y_shifts, expanded_strides,
-              num_classes, use_l1):
-    """
-    :param labels: COCO labels
-    :param outputs: [batch, n_anchors_all, 4+1+num_classes]
-    :param x_shifts: x shifts of anchors
-    :param y_shifts: y shifts of anchors
-    :param expanded_strides: strides of anchors
-    :param num_classes
-    :param use_l1: l1 loss for boxes
-    :return: loss
-    """
-    bbox_preds = outputs[:, :, :4]  # [batch, n_anchors_all, 4]
-    obj_preds = outputs[:, :, 4].unsqueeze(-1)  # [batch, n_anchors_all, 1]
-    cls_preds = outputs[:, :, 5:]  # [batch, n_anchors_all, n_classes]
+class YOLOXLoss:
+    def __init__(self, num_classes, strides, use_l1=False):
+        super(YOLOXLoss, self).__init__()
+        self.num_classes = num_classes
+        self.strides = strides
+        self.n_anchors = 1
+        self.grids = [torch.zeros(1)] * len(strides)
+        self.use_l1 = use_l1
 
-    nlabel = (labels.sum(dim=2) > 0).sum(dim=1)  # number of objects (list)
-    total_num_anchors = outputs.shape[1]  # n_anchors_all (int)
-    x_shifts = torch.cat(x_shifts, 1)  # [1, n_anchors_all]
-    y_shifts = torch.cat(y_shifts, 1)  # [1, n_anchors_all]
-    expanded_strides = torch.cat(expanded_strides, 1).type_as(x_shifts)
+    def __call__(self, inputs, labels):
+        preds, x_shifts, y_shifts, expanded_strides = decode(inputs, self.n_anchors, self.num_classes,
+                                                             self.strides, self.grids)
 
-    cls_targets = []
-    reg_targets = []
-    l1_targets = []
-    obj_targets = []
-    fg_masks = []
-    num_fgs = 0
-    num_gts = 0
+        bbox_preds = preds[:, :, :4]  # [batch, n_anchors_all, 4]
+        obj_preds = preds[:, :, 4].unsqueeze(-1)  # [batch, n_anchors_all, 1]
+        cls_preds = preds[:, :, 5:]  # [batch, n_anchors_all, n_classes]
 
-    for batch_idx in range(outputs.shape[0]):
-        num_gt = int(nlabel[batch_idx])
-        num_gts += num_gt
-        if num_gt == 0:
-            cls_target = outputs.new_zeros((0, num_classes))
-            reg_target = outputs.new_zeros((0, 4))
-            l1_target = outputs.new_zeros((0, 4))
-            obj_target = outputs.new_zeros((total_num_anchors, 1))
-            fg_mask = outputs.new_zeros(total_num_anchors).bool()
+        nlabel = (labels.sum(dim=2) > 0).sum(dim=1)  # number of objects (list)
+        total_num_anchors = preds.shape[1]  # n_anchors_all (int)
+        x_shifts = torch.cat(x_shifts, 1)  # [1, n_anchors_all]
+        y_shifts = torch.cat(y_shifts, 1)  # [1, n_anchors_all]
+        expanded_strides = torch.cat(expanded_strides, 1).type_as(x_shifts)
+
+        cls_targets = []
+        reg_targets = []
+        l1_targets = []
+        obj_targets = []
+        fg_masks = []
+        num_fgs = 0
+        num_gts = 0
+
+        for batch_idx in range(preds.shape[0]):
+            num_gt = int(nlabel[batch_idx])
+            num_gts += num_gt
+            if num_gt == 0:
+                cls_target = preds.new_zeros((0, self.num_classes))
+                reg_target = preds.new_zeros((0, 4))
+                l1_target = preds.new_zeros((0, 4))
+                obj_target = preds.new_zeros((total_num_anchors, 1))
+                fg_mask = preds.new_zeros(total_num_anchors).bool()
+            else:
+                gt_bboxes_per_image = labels[batch_idx, :num_gt, 1:5]
+                gt_classes_per_image = labels[batch_idx, :num_gt, 0]
+                bboxes_preds_per_image = bbox_preds[batch_idx]
+
+                with torch.no_grad():
+                    # Get valuable grids according ground truth
+                    fg_mask, in_boxes_and_center_mask = get_in_boxes_info(
+                        gt_bboxes_per_image,
+                        expanded_strides,
+                        x_shifts,
+                        y_shifts,
+                        total_num_anchors,
+                        num_gt,
+                    )
+
+                    bboxes_preds_per_image = bboxes_preds_per_image[fg_mask]
+                    cls_preds_ = cls_preds[batch_idx][fg_mask]
+                    obj_preds_ = obj_preds[batch_idx][fg_mask]
+                    num_in_boxes_anchor = bboxes_preds_per_image.shape[0]
+
+                    pair_wise_ious = bboxes_iou(gt_bboxes_per_image, bboxes_preds_per_image, False)
+                    # 以e为底的log函数，iou趋近1为0，iou为0趋近18.42
+                    pair_wise_ious_loss = -torch.log(pair_wise_ious + 1e-8)
+
+                    gt_cls_per_image = (
+                        F.one_hot(gt_classes_per_image.to(torch.int64), self.num_classes)
+                            .float()
+                            .unsqueeze(1)
+                            .repeat(1, num_in_boxes_anchor, 1)
+                    )
+
+                    cls_preds_ = (
+                            cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
+                            * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
+                    )
+
+                    pair_wise_cls_loss = F.binary_cross_entropy(
+                        cls_preds_.sqrt_(), gt_cls_per_image, reduction="none"
+                    ).sum(-1)
+                    del cls_preds_
+
+                    cost = (
+                            pair_wise_cls_loss
+                            + 3.0 * pair_wise_ious_loss
+                            + 100000.0 * (~in_boxes_and_center_mask)
+                    )
+
+                    # Dynamic k methods: select the final predictions.
+                    (
+                        fg_mask,
+                        num_fg,
+                        matched_gt_inds,
+                        gt_matched_classes,
+                        pred_ious_this_matching,
+                    ) = dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes_per_image, num_gt)
+                    del pair_wise_cls_loss, cost, pair_wise_ious, pair_wise_ious_loss
+
+                # predict anchors of the whole batch.
+                num_fgs += num_fg
+
+                cls_target = F.one_hot(
+                    gt_matched_classes.to(torch.int64), self.num_classes
+                ) * pred_ious_this_matching.unsqueeze(-1)
+                obj_target = fg_mask.unsqueeze(-1)
+                reg_target = gt_bboxes_per_image[matched_gt_inds]
+
+            cls_targets.append(cls_target)
+            reg_targets.append(reg_target)
+            obj_targets.append(obj_target.type_as(reg_target))
+            fg_masks.append(fg_mask)
+
+        # all predict anchors of this batch images
+        cls_targets = torch.cat(cls_targets, 0)
+        reg_targets = torch.cat(reg_targets, 0)
+        obj_targets = torch.cat(obj_targets, 0)
+        fg_masks = torch.cat(fg_masks, 0)
+
+        num_fgs = max(num_fgs, 1)
+
+        iou_loss = IOUloss(reduction="none")
+        loss_iou = (iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
+
+        bcewithlog_loss = nn.BCEWithLogitsLoss(reduction="none")
+        loss_obj = (bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)).sum() / num_fgs
+
+        loss_cls = (bcewithlog_loss(cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets)).sum() / num_fgs
+
+        # L1loss is the distance among the four property of a predicted box.
+        if self.use_l1:
+            # The raw properties are too big like 200-800, need a function to adjust.
+            l1_loss = nn.L1Loss(reduction="none")
+            loss_l1 = (l1_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
         else:
-            gt_bboxes_per_image = labels[batch_idx, :num_gt, 1:5]
-            gt_classes_per_image = labels[batch_idx, :num_gt, 0]
-            bboxes_preds_per_image = bbox_preds[batch_idx]
+            loss_l1 = 0.0
 
-            with torch.no_grad():
-                # Get valuable grids according ground truth
-                fg_mask, in_boxes_and_center_mask = get_in_boxes_info(
-                    gt_bboxes_per_image,
-                    expanded_strides,
-                    x_shifts,
-                    y_shifts,
-                    total_num_anchors,
-                    num_gt,
-                )
+        reg_weight = 5.0
+        loss = reg_weight * loss_iou + loss_obj + loss_cls + loss_l1
 
-                bboxes_preds_per_image = bboxes_preds_per_image[fg_mask]
-                cls_preds_ = cls_preds[batch_idx][fg_mask]
-                obj_preds_ = obj_preds[batch_idx][fg_mask]
-                num_in_boxes_anchor = bboxes_preds_per_image.shape[0]
+        return (
+            loss,
+            reg_weight * loss_iou,
+            loss_obj,
+            loss_cls,
+            loss_l1,
+            num_fgs / max(num_gts, 1),
+        )
 
-                pair_wise_ious = bboxes_iou(gt_bboxes_per_image, bboxes_preds_per_image, False)
-                # 以e为底的log函数，iou趋近1为0，iou为0趋近18.42
-                pair_wise_ious_loss = -torch.log(pair_wise_ious + 1e-8)
 
-                gt_cls_per_image = (
-                    F.one_hot(gt_classes_per_image.to(torch.int64), num_classes)
-                        .float()
-                        .unsqueeze(1)
-                        .repeat(1, num_in_boxes_anchor, 1)
-                )
+def decode(inputs, n_anchors, num_classes, strides, grids):
+    preds = []
+    x_shifts = []
+    y_shifts = []
+    expanded_strides = []
+    batch_size = inputs[0].shape[0]
+    n_ch = 4 + 1 + n_anchors * num_classes  # the channel of one ground truth prediction.
 
-                cls_preds_ = (
-                    cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
-                    * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
-                )
+    for i in range(len(inputs)):
+        # Change all inputs to the same channel.
+        pred = inputs[i]
+        h, w = pred.shape[-2:]
 
-                pair_wise_cls_loss = F.binary_cross_entropy(
-                    cls_preds_.sqrt_(), gt_cls_per_image, reduction="none"
-                ).sum(-1)
-                del cls_preds_
+        # Three steps to localize predictions: grid, shifts of x and y, grid with stride
+        if grids[i].shape[2:4] != pred.shape[2:4]:
+            yv, xv = torch.meshgrid([torch.arange(h), torch.arange(w)])
+            grid = torch.stack((xv, yv), 2).view(1, 1, h, w, 2).type_as(pred)
+            grid = grid.view(1, -1, 2)
+            # grid: [1, h * w, 2]
+            grids[i] = grid
+        else:
+            grid = grids[i]
+        x_shifts.append(grid[:, :, 0])
+        y_shifts.append(grid[:, :, 1])
+        expanded_strides.append(
+            torch.zeros(1, grid.shape[1]).fill_(strides[i]).type_as(pred)
+        )
 
-                cost = (
-                    pair_wise_cls_loss
-                    + 3.0 * pair_wise_ious_loss
-                    + 100000.0 * (~in_boxes_and_center_mask)
-                )
+        pred = pred.view(batch_size, n_anchors, n_ch, h, w)
+        pred = pred.permute(0, 1, 3, 4, 2).reshape(
+            batch_size, n_anchors * h * w, -1
+        )
+        # pred: [batch_size, h * w, n_ch]
+        pred[..., :2] = (pred[..., :2] + grid) * strides[i]
+        # The predictions of w and y are logs
+        pred[..., 2:4] = torch.exp(pred[..., 2:4]) * strides[i]
+        preds.append(pred)
 
-                # Dynamic k methods: select the final predictions.
-                (
-                    fg_mask,
-                    num_fg,
-                    matched_gt_inds,
-                    gt_matched_classes,
-                    pred_ious_this_matching,
-                ) = dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes_per_image, num_gt)
-                del pair_wise_cls_loss, cost, pair_wise_ious, pair_wise_ious_loss
-
-            # predict anchors of the whole batch.
-            num_fgs += num_fg
-
-            cls_target = F.one_hot(
-                gt_matched_classes.to(torch.int64), num_classes
-            ) * pred_ious_this_matching.unsqueeze(-1)
-            obj_target = fg_mask.unsqueeze(-1)
-            reg_target = gt_bboxes_per_image[matched_gt_inds]
-
-        cls_targets.append(cls_target)
-        reg_targets.append(reg_target)
-        obj_targets.append(obj_target.type_as(reg_target))
-        fg_masks.append(fg_mask)
-
-    # all predict anchors of this batch images
-    cls_targets = torch.cat(cls_targets, 0)
-    reg_targets = torch.cat(reg_targets, 0)
-    obj_targets = torch.cat(obj_targets, 0)
-    fg_masks = torch.cat(fg_masks, 0)
-
-    num_fgs = max(num_fgs, 1)
-
-    iou_loss = IOUloss(reduction="none")
-    loss_iou = (iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
-
-    bcewithlog_loss = nn.BCEWithLogitsLoss(reduction="none")
-    loss_obj = (bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)).sum() / num_fgs
-
-    loss_cls = (bcewithlog_loss(cls_preds.view(-1, num_classes)[fg_masks], cls_targets)).sum() / num_fgs
-
-    # L1loss is the distance among the four property of a predicted box.
-    if use_l1:
-        # The raw properties are too big like 200-800, need a function to adjust.
-        l1_loss = nn.L1Loss(reduction="none")
-        loss_l1 = (l1_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
-    else:
-        loss_l1 = 0.0
-
-    reg_weight = 5.0
-    loss = reg_weight * loss_iou + loss_obj + loss_cls + loss_l1
-
-    return (
-        loss,
-        reg_weight * loss_iou,
-        loss_obj,
-        loss_cls,
-        loss_l1,
-        num_fgs / max(num_gts, 1),
-    )
+    # preds: [batch_size, all predictions, n_ch]
+    preds = torch.cat(preds, 1)
+    return preds, x_shifts, y_shifts, expanded_strides
 
 
 def get_in_boxes_info(

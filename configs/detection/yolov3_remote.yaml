@@ -17,15 +17,15 @@ DECOUPLEDHEAD:
     CLASSES: 6
 
 DECODER:
-    ANCHORS: [[[116, 90], [156, 198], [373, 326]],
+    ANCHORS: [[[10, 13], [16, 30], [33, 23]],
               [[30, 61], [62, 45], [59, 119]],
-              [[10, 13], [16, 30], [33, 23]]]
+              [[116, 90], [156, 198], [373, 326]]]
 
 DATASET:
     DIR: '/root/autodl-tmp/COCO'
-    TRAIN_JSON: 'train.json'
-    VAL_JSON: 'train.json'
-    TEST_JSON: 'val.json'
+    TRAIN: 'train.json'  # directory name of training image and the name of json file
+    VAL: 'val.json'
+    TEST: 'test.json'
     TRAIN_SIZE: [416,416]
     VAL_SIZE: [416,416]
     TRAIN_BATCH_SIZE: 32

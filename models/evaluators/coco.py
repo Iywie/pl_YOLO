@@ -1,8 +1,10 @@
 import io
 import json
+import torch
+import numpy as np
 import tempfile
 import contextlib
-from data.datasets.pycocotools.cocoeval import COCOeval
+from models.data.datasets.pycocotools.cocoeval import COCOeval
 
 
 def COCOEvaluator(data_dict, val_dataset):
@@ -44,11 +46,13 @@ def convert_to_coco_format(outputs, ids, hws, val_size, class_ids):
         )
         bboxes /= scale
         bboxes = xyxy2xywh(bboxes)
+        # bboxes = xyxy2cxcywh(bboxes)
+        # bboxes[:, :2] -= bboxes[:, 2:] / 2  # xy center to top-left corner
 
-        # cls = output[:, 6]
-        # scores = output[:, 4] * output[:, 5]
-        cls = output[:, 5]
-        scores = output[:, 4]
+        cls = output[:, 6]
+        scores = output[:, 4] * output[:, 5]
+        # cls = output[:, 5]
+        # scores = output[:, 4]
         for ind in range(bboxes.shape[0]):
             label = class_ids[int(cls[ind])]
             pred_data = {
@@ -66,3 +70,13 @@ def xyxy2xywh(bboxes):
     bboxes[:, 2] = bboxes[:, 2] - bboxes[:, 0]
     bboxes[:, 3] = bboxes[:, 3] - bboxes[:, 1]
     return bboxes
+
+
+def xyxy2cxcywh(x):
+    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = (x[:, 0] + x[:, 2]) / 2  # x center
+    y[:, 1] = (x[:, 1] + x[:, 3]) / 2  # y center
+    y[:, 2] = x[:, 2] - x[:, 0]  # width
+    y[:, 3] = x[:, 3] - x[:, 1]  # height
+    return y

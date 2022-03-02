@@ -1,26 +1,32 @@
 # Parameters
 
+backbone:
+    name: "cspdarknet"
+    depth: 0.5
+    input_channels: [32, 64, 128, 256, 512] # five blocks
+    output_features: ["dark3", "dark4", "dark5"]
+    normalization: "bn"
+    activation: "silu"
+neck:
+    name: "pafpn"
+    depth: 0.5
+    input_channels: [128, 256, 512]
+    normalization: "bn"
+    activation: "silu"
+head:
+    name: "decoupled_head"
+    classes: 6
 
-CSPDARKNET:
-    DEPTH: 0.5
-    INPUT_CHANNELS: [32, 64, 128, 256, 512] # five blocks
-    OUT_FEATURES: ["dark3", "dark4", "dark5"]
-    NORM: "bn"
-    ACT: "silu"
-PAFPN:
-    DEPTH: 0.5
-    INPUT_CHANNELS: [128, 256, 512]
-    NORM: "bn"
-    ACT: "silu"
-YOLOXHEAD:
-    CLASSES: 6
+dataset:
+    dir: '/root/autodl-tmp/COCO'
+    train: 'train'  # directory name of training image
+    val: 'val'
+    test: 'test'
+    train_size: [ 416,416 ]
+    val_size: [ 416,416 ]
+    train_batch_size: 32
+    val_batch_size: 32
 
-DATASET:
-    DIR: '/root/autodl-tmp/COCO'
-    TRAIN_JSON: 'train.json'
-    VAL_JSON: 'val.json'
-    TEST_JSON: 'val.json'
-    TRAIN_SIZE: [ 416,416 ]
-    VAL_SIZE: [ 416,416 ]
-    TRAIN_BATCH_SIZE: 32
-    VAL_BATCH_SIZE: 32
+transform:
+    mosaic_epoch: 200
+

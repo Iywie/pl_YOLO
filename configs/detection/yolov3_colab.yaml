@@ -23,9 +23,9 @@ DECODER:
 
 DATASET:
     DIR: '/content/drive/MyDrive/COCO'
-    TRAIN_JSON: 'train.json'
-    VAL_JSON: 'val.json'
-    TEST_JSON: 'test.json'
+    TRAIN: 'train.json'  # directory name of training image and the name of json file
+    VAL: 'val.json'
+    TEST: 'test.json'
     TRAIN_SIZE: [224,224]
     VAL_SIZE: [224,224]
     TRAIN_BATCH_SIZE: 32

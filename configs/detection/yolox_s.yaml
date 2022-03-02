@@ -1,25 +1,32 @@
 # Parameters
 
-CSPDARKNET:
-    DEPTH: 0.5
-    INPUT_CHANNELS: [32, 64, 128, 256, 512] # five blocks
-    OUT_FEATURES: ["dark3", "dark4", "dark5"]
-    NORM: "bn"
-    ACT: "silu"
-PAFPN:
-    DEPTH: 0.5
-    INPUT_CHANNELS: [128, 256, 512]
-    NORM: "bn"
-    ACT: "silu"
-YOLOXHEAD:
-    CLASSES: 6
+backbone:
+    name: "cspdarknet"
+    depth: 0.5
+    input_channels: [32, 64, 128, 256, 512] # five blocks
+    output_features: ["dark3", "dark4", "dark5"]
+    normalization: "bn"
+    activation: "silu"
+neck:
+    name: "pafpn"
+    depth: 0.5
+    input_channels: [128, 256, 512]
+    normalization: "bn"
+    activation: "silu"
+head:
+    name: "decoupled_head"
+    classes: 6
 
-DATASET:
-    DIR: 'D:\Code\Datasets\Detection\Steel_NEU\COCO'
-    TRAIN_JSON: 'train.json'
-    VAL_JSON: 'val.json'
-    TEST_JSON: 'test.json'
-    TRAIN_SIZE: [224,224]
-    VAL_SIZE: [224,224]
-    TRAIN_BATCH_SIZE: 16
-    VAL_BATCH_SIZE: 16
+dataset:
+    format: "COCO"
+    dir: 'D:\Code\Datasets\Detection\Steel_NEU\COCO'
+    train: 'train'  # directory name of training image
+    val: 'val'
+    test: 'test'
+    train_size: [224,224]
+    val_size: [224,224]
+    train_batch_size: 4
+    val_batch_size: 4
+
+transform:
+    mosaic_epoch: 50
