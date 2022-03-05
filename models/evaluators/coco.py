@@ -4,7 +4,8 @@ import torch
 import numpy as np
 import tempfile
 import contextlib
-from models.data.datasets.pycocotools.cocoeval import COCOeval
+from pycocotools.cocoeval import COCOeval
+# from models.data.datasets.pycocotools.cocoeval import COCOeval
 
 
 def COCOEvaluator(data_dict, val_dataset):

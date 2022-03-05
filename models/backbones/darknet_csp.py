@@ -86,4 +86,6 @@ class CSPDarkNet(nn.Module):
         outputs["dark4"] = x
         x = self.dark5(x)
         outputs["dark5"] = x
-        return {k: v for k, v in outputs.items() if k in self.out_features}
+        if len(self.out_features) <= 1:
+            return x
+        return [v for k, v in outputs.items() if k in self.out_features]

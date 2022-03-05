@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision
 
 
-class YOLOXDecoder(nn.Module):
+class YOLOXDecoder:
     def __init__(
             self,
             num_classes,
@@ -15,7 +15,7 @@ class YOLOXDecoder(nn.Module):
         self.strides = strides
         self.grids = [torch.zeros(1)] * len(strides)
 
-    def forward(self, inputs, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
+    def __call__(self, inputs, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
         preds = []
         batch_size = inputs[0].shape[0]
         n_ch = 4 + 1 + self.n_anchors * self.num_classes  # the channel of one ground truth prediction.
@@ -47,6 +47,8 @@ class YOLOXDecoder(nn.Module):
 
         # preds: [batch_size, all predictions, n_ch]
         predictions = torch.cat(preds, 1)
+        predictions[..., 4] = predictions[..., 4].sigmoid()
+        predictions[..., 5:] = predictions[..., 5:].sigmoid()
 
         # from (cx,cy,w,h) to (x1,y1,x2,y2)
         box_corner = predictions.new(predictions.shape)

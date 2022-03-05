@@ -62,8 +62,7 @@ class PAFPN(nn.Module):
 
     def forward(self, inputs):
         #  backbone
-        features = [inputs[f] for f in self.in_features]
-        [c3, c4, c5] = features
+        [c3, c4, c5] = inputs
         # top-down
         p5 = c5
         p5_expand = self.shrink_conv1(p5)

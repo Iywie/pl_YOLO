@@ -21,7 +21,7 @@ class COCODataset(Dataset):
                  name,
                  img_size,
                  preprocess=None,
-                 mosaic=False,
+                 cache=False,
                  ):
         super().__init__()
         self.data_dir = data_dir
@@ -34,6 +34,9 @@ class COCODataset(Dataset):
         self.ids = self.coco.getImgIds()
         self.class_ids = sorted(self.coco.getCatIds())
         self.annotations = self._load_coco_annotations()
+        self.imgs = None
+        if cache:
+            self._cache_images()
 
     def __len__(self):
         return len(self.ids)
@@ -56,7 +59,11 @@ class COCODataset(Dataset):
         id_ = self.ids[index]
         res, img_hw, resized_info, img_name = self.annotations[index]
         # load image from file
-        img = self.load_resized_img(index)
+        if self.imgs is not None:
+            pad_img = self.imgs[index]
+            img = pad_img[: resized_info[0], : resized_info[1], :].copy()
+        else:
+            img = self.load_resized_img(index)
 
         if self.preprocess is not None:
             img, target = self.preprocess(img, res, self.img_size)
@@ -121,3 +128,51 @@ class COCODataset(Dataset):
         img = cv2.imread(img_file)
         assert img is not None, f'The problem image is {file_name}'
         return img
+
+    def _cache_images(self):
+        print(
+            "\n********************************************************************************\n"
+            "You are using cached images in RAM to accelerate training.\n"
+            "This requires large system RAM.\n"
+            "Make sure you have 200G+ RAM and 136G available disk space for training COCO.\n"
+            "********************************************************************************\n"
+        )
+        max_h = self.img_size[0]
+        max_w = self.img_size[1]
+        cache_file = self.data_dir + "/img_resized_cache_" + self.name + ".array"
+        if not os.path.exists(cache_file):
+            print(
+                "Caching images for the first time. This might take about 20 minutes for COCO"
+            )
+            self.imgs = np.memmap(
+                cache_file,
+                shape=(len(self.ids), max_h, max_w, 3),
+                dtype=np.uint8,
+                mode="w+",
+            )
+            from tqdm import tqdm
+            from multiprocessing.pool import ThreadPool
+
+            NUM_THREADs = min(8, os.cpu_count())
+            loaded_images = ThreadPool(NUM_THREADs).imap(
+                lambda x: self.load_resized_img(x),
+                range(len(self.annotations)),
+            )
+            pbar = tqdm(enumerate(loaded_images), total=len(self.annotations))
+            for k, out in pbar:
+                self.imgs[k][: out.shape[0], : out.shape[1], :] = out.copy()
+            self.imgs.flush()
+            pbar.close()
+        else:
+            print(
+                "You are using cached imgs! Make sure your dataset is not changed!!\n"
+                "Everytime the self.input_size is changed in your exp file, you need to delete\n"
+                "the cached data and re-generate them.\n"
+            )
+
+        self.imgs = np.memmap(
+            cache_file,
+            shape=(len(self.ids), max_h, max_w, 3),
+            dtype=np.uint8,
+            mode="r+",
+        )

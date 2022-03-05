@@ -14,8 +14,7 @@ class YOLOXLoss:
         self.use_l1 = use_l1
 
     def __call__(self, inputs, labels):
-        preds, x_shifts, y_shifts, expanded_strides = decode(inputs, self.n_anchors, self.num_classes,
-                                                             self.strides, self.grids)
+        preds, x_shifts, y_shifts, expanded_strides = self.decode(inputs)
 
         bbox_preds = preds[:, :, :4]  # [batch, n_anchors_all, 4]
         obj_preds = preds[:, :, 4].unsqueeze(-1)  # [batch, n_anchors_all, 1]
@@ -80,7 +79,6 @@ class YOLOXLoss:
                             cls_preds_.float().unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
                             * obj_preds_.unsqueeze(0).repeat(num_gt, 1, 1).sigmoid_()
                     )
-
                     pair_wise_cls_loss = F.binary_cross_entropy(
                         cls_preds_.sqrt_(), gt_cls_per_image, reduction="none"
                     ).sum(-1)
@@ -152,48 +150,46 @@ class YOLOXLoss:
             num_fgs / max(num_gts, 1),
         )
 
+    def decode(self, inputs):
+        preds = []
+        x_shifts = []
+        y_shifts = []
+        expanded_strides = []
+        batch_size = inputs[0].shape[0]
+        n_ch = 4 + 1 + self.n_anchors * self.num_classes  # the channel of one ground truth prediction.
 
-def decode(inputs, n_anchors, num_classes, strides, grids):
-    preds = []
-    x_shifts = []
-    y_shifts = []
-    expanded_strides = []
-    batch_size = inputs[0].shape[0]
-    n_ch = 4 + 1 + n_anchors * num_classes  # the channel of one ground truth prediction.
+        for i in range(len(inputs)):
+            # Change all inputs to the same channel.
+            pred = inputs[i]
+            h, w = pred.shape[-2:]
 
-    for i in range(len(inputs)):
-        # Change all inputs to the same channel.
-        pred = inputs[i]
-        h, w = pred.shape[-2:]
+            # Three steps to localize predictions: grid, shifts of x and y, grid with stride
+            if self.grids[i].shape[2:4] != pred.shape[2:4]:
+                yv, xv = torch.meshgrid([torch.arange(h), torch.arange(w)])
+                grid = torch.stack((xv, yv), 2).view(1, 1, h, w, 2).type_as(pred)
+                grid = grid.view(1, -1, 2)  # (1, h * w, 2)
+                self.grids[i] = grid
+            else:
+                grid = self.grids[i]
+            x_shifts.append(grid[:, :, 0])
+            y_shifts.append(grid[:, :, 1])
+            expanded_strides.append(
+                torch.zeros(1, grid.shape[1]).fill_(self.strides[i]).type_as(pred)
+            )
 
-        # Three steps to localize predictions: grid, shifts of x and y, grid with stride
-        if grids[i].shape[2:4] != pred.shape[2:4]:
-            yv, xv = torch.meshgrid([torch.arange(h), torch.arange(w)])
-            grid = torch.stack((xv, yv), 2).view(1, 1, h, w, 2).type_as(pred)
-            grid = grid.view(1, -1, 2)
-            # grid: [1, h * w, 2]
-            grids[i] = grid
-        else:
-            grid = grids[i]
-        x_shifts.append(grid[:, :, 0])
-        y_shifts.append(grid[:, :, 1])
-        expanded_strides.append(
-            torch.zeros(1, grid.shape[1]).fill_(strides[i]).type_as(pred)
-        )
+            pred = pred.view(batch_size, self.n_anchors, n_ch, h, w)
+            pred = pred.permute(0, 1, 3, 4, 2).reshape(
+                batch_size, self.n_anchors * h * w, -1
+            )
+            # pred: [batch_size, h * w, n_ch]
+            pred[..., :2] = (pred[..., :2] + grid) * self.strides[i]
+            # The predictions of w and y are logs
+            pred[..., 2:4] = torch.exp(pred[..., 2:4]) * self.strides[i]
+            preds.append(pred)
 
-        pred = pred.view(batch_size, n_anchors, n_ch, h, w)
-        pred = pred.permute(0, 1, 3, 4, 2).reshape(
-            batch_size, n_anchors * h * w, -1
-        )
-        # pred: [batch_size, h * w, n_ch]
-        pred[..., :2] = (pred[..., :2] + grid) * strides[i]
-        # The predictions of w and y are logs
-        pred[..., 2:4] = torch.exp(pred[..., 2:4]) * strides[i]
-        preds.append(pred)
-
-    # preds: [batch_size, all predictions, n_ch]
-    preds = torch.cat(preds, 1)
-    return preds, x_shifts, y_shifts, expanded_strides
+        # preds: [batch_size, all predictions, n_ch]
+        preds = torch.cat(preds, 1)
+        return preds, x_shifts, y_shifts, expanded_strides
 
 
 def get_in_boxes_info(
@@ -307,7 +303,8 @@ def dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes, num_gt):
     dynamic_ks = torch.clamp(topk_ious.sum(1).int(), min=1)  # 将最大iou相加取整得到k
     for gt_idx in range(num_gt):
         _, pos_idx = cost[gt_idx].sort()
-        pos_idx = pos_idx[:dynamic_ks[gt_idx].detach()]
+        if dynamic_ks[gt_idx].item() < len(pos_idx) - 1:
+            pos_idx = pos_idx[:dynamic_ks[gt_idx].item()]
         # _, pos_idx = torch.topk(  # If largest is False then the smallest k elements are returned.
         #     cost[gt_idx], k=dynamic_ks[gt_idx].detach(), largest=False
         # )  # 返回k个最小cost的anchor的索引

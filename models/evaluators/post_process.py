@@ -27,65 +27,82 @@ def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnos
     prediction[:, :, :4] = box_corner[:, :, :4]
 
     output = [None for _ in range(len(prediction))]
-    for image_i, image_pred in enumerate(prediction):
-        # Filter out confidence scores below threshold
-        conf_mask = (image_pred[:, 4] >= conf_thre).squeeze()
-        image_pred = image_pred[conf_mask]
+    for i, image_pred in enumerate(prediction):
+
         # If none are remaining => process next image
         if not image_pred.size(0):
             continue
-        # Get score and class with the highest confidence
+        # Get score and class with highest confidence
         class_conf, class_pred = torch.max(image_pred[:, 5: 5 + num_classes], 1, keepdim=True)
-        # Detections ordered as (x1, y1, x2, y2, obj_conf, class_conf, class)
+
+        conf_mask = (image_pred[:, 4] * class_conf.squeeze() >= conf_thre).squeeze()
+        # Detections ordered as (x1, y1, x2, y2, obj_conf, class_conf, class_pred)
         detections = torch.cat((image_pred[:, :5], class_conf, class_pred.float()), 1)
+        detections = detections[conf_mask]
+        if not detections.size(0):
+            continue
 
-        # NMS processed with class
-        unique_labels = detections[:, -1].unique()
-        for c in unique_labels:
-            # Get the detections with the particular class
-            detections_class = detections[detections[:, -1] == c]
-            # Sort the detections by maximum objectness confidence
-            _, conf_sort_index = torch.sort(detections_class[:, 4], descending=True)
-            detections_class = detections_class[conf_sort_index]
-            # Perform non-maximum suppression
-            max_detections = []
-            while detections_class.size(0):
-                # Get lightning with the highest confidence and save as max lightning
-                max_detections.append(detections_class[0].unsqueeze(0))
-                # Stop if we're at the last lightning
-                if len(detections_class) == 1:
-                    break
-                # Get the IOUs for all boxes with lower confidence
-                ious = bbox_iou(max_detections[-1], detections_class[1:])
-                # Remove detections with IoU >= NMS threshold
-                detections_class = detections_class[1:][ious < nms_thre]
+        if class_agnostic:
+            nms_out_index = torchvision.ops.nms(
+                detections[:, :4],
+                detections[:, 4] * detections[:, 5],
+                nms_thre,
+            )
+        else:
+            nms_out_index = torchvision.ops.batched_nms(
+                detections[:, :4],
+                detections[:, 4] * detections[:, 5],
+                detections[:, 6],
+                nms_thre,
+            )
 
-            max_detections = torch.cat(max_detections)
-            # Add max detections to outputs
-            output[image_i] = max_detections if output[image_i] is None \
-                else torch.cat((output[image_i], max_detections))
+        detections = detections[nms_out_index]
+        if output[i] is None:
+            output[i] = detections
+        else:
+            output[i] = torch.cat((output[i], detections))
 
-        # if not detections.size(0):
-        #     continue
-        #
-        # # NMS
-        # if class_agnostic:
-        #     nms_out_index = torchvision.ops.nms(
-        #         detections[:, :4],
-        #         detections[:, 4] * detections[:, 5],
-        #         nms_thre,
-        #     )
-        # else:
-        #     nms_out_index = torchvision.ops.batched_nms(
-        #         detections[:, :4],
-        #         detections[:, 4] * detections[:, 5],
-        #         detections[:, 6],
-        #         nms_thre,
-        #     )
-        # # detections = non_max_suppression
-        # detections = detections[nms_out_index]
-        # output[i] = detections
     return output
+
+    # for image_i, image_pred in enumerate(prediction):
+    #     # Filter out confidence scores below threshold
+    #     conf_mask = (image_pred[:, 4] >= conf_thre).squeeze()
+    #     image_pred = image_pred[conf_mask]
+    #     # If none are remaining => process next image
+    #     if not image_pred.size(0):
+    #         continue
+    #     # Get score and class with the highest confidence
+    #     class_conf, class_pred = torch.max(image_pred[:, 5: 5 + num_classes], 1, keepdim=True)
+    #     # Detections ordered as (x1, y1, x2, y2, obj_conf, class_conf, class)
+    #     detections = torch.cat((image_pred[:, :5], class_conf, class_pred.float()), 1)
+    #
+    #     # NMS processed with class
+    #     unique_labels = detections[:, -1].unique()
+    #     for c in unique_labels:
+    #         # Get the detections with the particular class
+    #         detections_class = detections[detections[:, -1] == c]
+    #         # Sort the detections by maximum objectness confidence
+    #         _, conf_sort_index = torch.sort(detections_class[:, 4], descending=True)
+    #         detections_class = detections_class[conf_sort_index]
+    #         # Perform non-maximum suppression
+    #         max_detections = []
+    #         while detections_class.size(0):
+    #             # Get lightning with the highest confidence and save as max lightning
+    #             max_detections.append(detections_class[0].unsqueeze(0))
+    #             # Stop if we're at the last lightning
+    #             if len(detections_class) == 1:
+    #                 break
+    #             # Get the IOUs for all boxes with lower confidence
+    #             ious = bbox_iou(max_detections[-1], detections_class[1:])
+    #             # Remove detections with IoU >= NMS threshold
+    #             detections_class = detections_class[1:][ious < nms_thre]
+    #
+    #         max_detections = torch.cat(max_detections)
+    #         # Add max detections to outputs
+    #         output[image_i] = max_detections if output[image_i] is None \
+    #             else torch.cat((output[image_i], max_detections))
+    #
+    # return output
 
 
 def bbox_iou(box1, box2, x1y1x2y2=True):

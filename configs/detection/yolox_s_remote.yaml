@@ -1,4 +1,5 @@
 # Parameters
+model: "yolox"
 
 backbone:
     name: "cspdarknet"
@@ -18,15 +19,15 @@ head:
     classes: 6
 
 dataset:
+    format: "COCO"
     dir: '/root/autodl-tmp/COCO'
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
-    train_size: [ 416,416 ]
-    val_size: [ 416,416 ]
-    train_batch_size: 32
-    val_batch_size: 32
+    train_size: [416,416]   # [224,224]
+    val_size: [416,416]
+    train_batch_size: 64
+    val_batch_size: 64
 
 transform:
-    mosaic_epoch: 200
-
+    mosaic_epoch: 0

@@ -1,4 +1,5 @@
 # Parameters
+model: "yolox"
 
 backbone:
     name: "cspdarknet"
@@ -29,4 +30,4 @@ dataset:
     val_batch_size: 4
 
 transform:
-    mosaic_epoch: 50
+    mosaic_epoch: 0
