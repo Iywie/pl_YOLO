@@ -8,5 +8,6 @@ For now I haven't time to write a readme. The code can be a reference of object 
 ## Step of training
 ### 1. Change the dataset directory in configs.
 ### 2. Run
-python train.py -c <absolute path of the config>
-
+```python
+  python train.py -c <absolute path of the config>
+```
