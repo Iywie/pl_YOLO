@@ -1,6 +1,17 @@
 # Parameters
 model: "yolox"
 
+dataset:
+    format: "COCO"
+    dir: '/root/autodl-tmp/COCO'
+    train: 'train'  # directory name of training image
+    val: 'val'
+    test: 'test'
+    train_size: [224,224]   # [224,224] [416,416]
+    val_size: [224,224]
+    train_batch_size: 32
+    val_batch_size: 32
+
 backbone:
     name: "cspdarknet"
     depth: 0.5
@@ -18,16 +29,14 @@ head:
     name: "decoupled_head"
     classes: 6
 
-dataset:
-    format: "COCO"
-    dir: '/root/autodl-tmp/COCO'
-    train: 'train'  # directory name of training image
-    val: 'val'
-    test: 'test'
-    train_size: [416,416]   # [224,224]
-    val_size: [416,416]
-    train_batch_size: 64
-    val_batch_size: 64
+optimizer:
+    name: "SGD"
+    learning_rate: 0.01
+    momentum: 0.9
+    weight_decay: 0.0005
+    lr_scheduler: "CosineWarmupScheduler"
+    warmup: 5
+    ema: false
 
 transform:
-    mosaic_epoch: 0
+    mosaic_epoch: 50

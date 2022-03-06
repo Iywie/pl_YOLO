@@ -61,7 +61,10 @@ class MosaicDetection(Dataset):
 
             for i_mosaic, index in enumerate(indices):
                 _labels, _, _, img_name = self._dataset.annotations[index]
-                img = self._dataset.load_resized_img(index)
+                if self._dataset.imgs is not None:
+                    img = self._dataset.imgs[index]
+                else:
+                    img = self._dataset.load_resized_img(index)
                 h0, w0 = img.shape[:2]  # orig hw
                 scale = min(1. * input_h / h0, 1. * input_w / w0)
                 img = cv2.resize(
@@ -124,7 +127,10 @@ class MosaicDetection(Dataset):
         else:
             res, img_hw, resized_info, img_name = self._dataset.annotations[idx]
             self._dataset.img_size = self.img_size
-            img = self._dataset.load_resized_img(idx)
+            if self._dataset.imgs is not None:
+                img = self._dataset.imgs[idx]
+            else:
+                img = self._dataset.load_resized_img(idx)
             if self.preprocess is not None:
                 img, target = self.preprocess(img, res, self.img_size)
             else:
@@ -139,7 +145,10 @@ class MosaicDetection(Dataset):
             cp_index = random.randint(0, self.__len__() - 1)
             cp_labels = self._dataset.annotations[cp_index][0]
         cp_labels, _, _, _ = self._dataset.annotations[cp_index]
-        img = self._dataset.load_resized_img(cp_index)
+        if self._dataset.imgs is not None:
+            img = self._dataset.imgs[cp_index]
+        else:
+            img = self._dataset.load_resized_img(cp_index)
 
         if len(img.shape) == 3:
             cp_img = np.ones((input_dim[0], input_dim[1], 3), dtype=np.uint8) * 114

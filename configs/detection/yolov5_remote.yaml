@@ -1,32 +1,46 @@
 # Parameters
+model: "yolov5"
 
-CSPDARKNET:
-    DEPTH: 0.5
-    INPUT_CHANNELS: [32, 64, 128, 256, 512] # five blocks
-    OUT_FEATURES: ["dark3", "dark4", "dark5"]
-    NORM: "bn"
-    ACT: "silu"
+dataset:
+    format: "COCO"
+    dir: '/root/autodl-tmp/COCO'
+    train: 'train'  # directory name of training image
+    val: 'val'
+    test: 'test'
+    train_size: [416,416]   # [224,224] [416,416]
+    val_size: [416,416]
+    train_batch_size: 32
+    val_batch_size: 32
 
-PAFPN:
-    DEPTH: 0.5
-    INPUT_CHANNELS: [128, 256, 512]
-    NORM: "bn"
-    ACT: "silu"
+backbone:
+    name: "cspdarknet"
+    depth: 0.5
+    input_channels: [32, 64, 128, 256, 512] # five blocks
+    output_features: ["dark3", "dark4", "dark5"]
+    normalization: "bn"
+    activation: "silu"
+neck:
+    name: "pafpn"
+    depth: 0.5
+    input_channels: [128, 256, 512]
+    normalization: "bn"
+    activation: "silu"
+head:
+    name: "decoupled_head"
+    classes: 6
+    anchors:
+      - [ [10,13], [16,30], [33,23] ]  # P3/8
+      - [ [30,61], [62,45], [59,119] ]  # P4/16
+      - [ [116,90], [156,198], [373,326] ]  # P5/32
 
-DECOUPLEDHEAD:
-    CLASSES: 6
+optimizer:
+    name: "SGD"
+    learning_rate: 0.01
+    momentum: 0.9
+    weight_decay: 0.0005
+    lr_scheduler: "CosineWarmupScheduler"
+    warmup: 5
+    ema: false
 
-DECODER:
-    ANCHORS: [[[10, 13], [16, 30], [33, 23]],
-              [[30, 61], [62, 45], [59, 119]],
-              [[116, 90], [156, 198], [373, 326]]]
-
-DATASET:
-    DIR: '/root/autodl-tmp/COCO'
-    TRAIN: 'train.json'  # directory name of training image and the name of json file
-    VAL: 'val.json'
-    TEST: 'test.json'
-    TRAIN_SIZE: [640,640]
-    VAL_SIZE: [640,640]
-    TRAIN_BATCH_SIZE: 16
-    VAL_BATCH_SIZE: 16
+transform:
+    mosaic_epoch: 50

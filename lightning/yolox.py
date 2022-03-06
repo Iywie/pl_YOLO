@@ -1,49 +1,51 @@
-from pytorch_lightning import LightningModule
 import torch
 import torch.nn as nn
-
-import models.backbones as BACKBONE
-import models.necks as NECK
+from pytorch_lightning import LightningModule
+# Model
+from models.detectors.OneStage import OneStageD
+from models.backbones.darknet_csp import CSPDarkNet
+from models.necks.pafpn import PAFPN
 from models.heads.decoupled_head import DecoupledHead
 from models.heads.yolox.yolox_loss import YOLOXLoss
 from models.heads.yolox.yolox_decoder import YOLOXDecoder
 from models.heads.yolox.yolox_head import YOLOXHead
-from models.evaluators.coco_evaluator_mine import MyEvaluator_step
-from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
-from models.evaluators.post_process import coco_post
 
-from models.data.samplers import InfiniteSampler, YoloBatchSampler
+from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
+# Data
 from models.data.datasets.cocoDataset import COCODataset
+from models.data.samplers import InfiniteSampler, YoloBatchSampler
 from models.data.mosaic_detection import MosaicDetection
 from torch.utils.data.dataloader import DataLoader
 from models.data.data_augments import TrainTransform, ValTransform
+from torch.utils.data.sampler import BatchSampler, SequentialSampler, RandomSampler
 from torch.optim import SGD
 from models.lr_scheduler import CosineWarmupScheduler
-from torch.utils.data.sampler import BatchSampler, SequentialSampler
+from models.utils.ema import ModelEMA
 
 
 class LitYOLOX(LightningModule):
 
     def __init__(self, cfgs):
         super().__init__()
-        self.cfg_backbone = cfgs['backbone']
-        self.cfg_neck = cfgs['neck']
-        self.cfg_head = cfgs['head']
-        self.cfg_dataset = cfgs['dataset']
-        self.cfg_transform = cfgs['transform']
+        self.cb = cfgs['backbone']
+        self.cn = cfgs['neck']
+        self.ch = cfgs['head']
+        self.cd = cfgs['dataset']
+        self.co = cfgs['optimizer']
+        self.ct = cfgs['transform']
         # backbone parameters
-        b_depth = self.cfg_backbone['depth']
-        b_norm = self.cfg_backbone['normalization']
-        b_act = self.cfg_backbone['activation']
-        b_channels = self.cfg_backbone['input_channels']
-        out_features = self.cfg_backbone['output_features']
+        b_depth = self.cb['depth']
+        b_norm = self.cb['normalization']
+        b_act = self.cb['activation']
+        b_channels = self.cb['input_channels']
+        out_features = self.cb['output_features']
         # neck parameters
-        n_depth = self.cfg_neck['depth']
-        n_channels = self.cfg_neck['input_channels']
-        n_norm = self.cfg_neck['normalization']
-        n_act = self.cfg_neck['activation']
+        n_depth = self.cn['depth']
+        n_channels = self.cn['input_channels']
+        n_norm = self.cn['normalization']
+        n_act = self.cn['activation']
         # head parameters
-        self.num_classes = self.cfg_head['classes']
+        self.num_classes = self.ch['classes']
         n_anchors = 1
         strides = [8, 16, 32]
         # loss parameters
@@ -52,17 +54,17 @@ class LitYOLOX(LightningModule):
         self.nms_threshold = 0.65
         self.confidence_threshold = 0.01
         # dataloader parameters
-        self.data_dir = self.cfg_dataset['dir']
-        self.train_dir = self.cfg_dataset['train']
-        self.val_dir = self.cfg_dataset['val']
-        self.img_size_train = tuple(self.cfg_dataset['train_size'])
-        self.img_size_val = tuple(self.cfg_dataset['val_size'])
-        self.train_batch_size = self.cfg_dataset['train_batch_size']
-        self.val_batch_size = self.cfg_dataset['val_batch_size']
+        self.data_dir = self.cd['dir']
+        self.train_dir = self.cd['train']
+        self.val_dir = self.cd['val']
+        self.img_size_train = tuple(self.cd['train_size'])
+        self.img_size_val = tuple(self.cd['val_size'])
+        self.train_batch_size = self.cd['train_batch_size']
+        self.val_batch_size = self.cd['val_batch_size']
         self.dataset_val = None
         self.dataset_train = None
         # --------------- transform config ----------------- #
-        self.mosaic_epoch = self.cfg_transform['mosaic_epoch']
+        self.mosaic_epoch = self.ct['mosaic_epoch']
         self.mosaic_prob = 1.0
         self.mixup_prob = 1.0
         self.hsv_prob = 1.0
@@ -75,41 +77,57 @@ class LitYOLOX(LightningModule):
         self.perspective = 0.0
         self.enable_mixup = True
         # Training
-        self.warmup = 5
+        self.warmup = self.co['warmup']
 
-        self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
-        self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
+        self.backbone = CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
+        self.neck = PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
         self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
-        self.head.initialize_biases(1e-2)
         self.loss = YOLOXLoss(self.num_classes, strides)
         self.decoder = YOLOXDecoder(self.num_classes, strides)
         self.test_head = YOLOXHead(self.num_classes, strides, n_channels, n_act)
 
-        self.models = [self.backbone, self.neck, self.head]
+        self.model = OneStageD(self.backbone, self.neck, self.head)
+        self.ema = self.co['ema']
+        self.ema_model = None
 
-        for model in self.models:
-            model.apply(initializer)
+        # self.head.initialize_biases(1e-2)
+        # self.model.apply(initializer)
+
+    def on_train_start(self):
+        if self.ema:
+            self.ema_model = ModelEMA(self.model, 0.9998)
+            self.ema_model.updates = len(self.dataset_train) * self.current_epoch
 
     def training_step(self, batch, batch_idx):
         imgs, labels, _, _, _ = batch
-        output = self.backbone(imgs)
-        output = self.neck(output)
-        output = self.head(output)
-        outputs = self.loss(output, labels)
-        loss = outputs[0]
-        self.lr_scheduler.step()
-        self.log("lr", self.lr_scheduler.optimizer.param_groups[0]['lr'], prog_bar=True)
+        output = self.model(imgs)
+        loss, loss_iou, loss_obj, loss_cls, loss_l1, proportion = self.loss(output, labels)
+        self.log("loss/loss", loss, prog_bar=False)
+        self.log("loss/iou", loss_iou, prog_bar=False)
+        self.log("loss/obj", loss_obj, prog_bar=False)
+        self.log("loss/cls", loss_cls, prog_bar=False)
+        self.log("loss/l1", loss_l1, prog_bar=False)
+        self.log("loss/proportion", proportion, prog_bar=False)
         return loss
 
+    def on_train_batch_end(self, outputs, batch, batch_idx, unused=0):
+        self.lr_scheduler.step()
+        self.log("lr", self.lr_scheduler.optimizer.param_groups[0]['lr'], prog_bar=True)
+        if self.ema:
+            self.ema_model.update(self.model)
+
     def training_epoch_end(self, outputs):
-        pass
+        if self.current_epoch > self.mosaic_epoch:
+            self.dataset_train.enable_mosaic = False
 
     def validation_step(self, batch, batch_idx):
         imgs, labels, img_hw, image_id, img_name = batch
-        output = self.backbone(imgs)
-        output = self.neck(output)
-        outputs = self.head(output)
-        detections = self.decoder(outputs, self.confidence_threshold, self.nms_threshold)
+        if self.ema:
+            model = self.ema_model.ema
+        else:
+            model = self.model
+        output = model(imgs)
+        detections = self.decoder(output, self.confidence_threshold, self.nms_threshold)
         detections = convert_to_coco_format(detections, image_id, img_hw, self.img_size_val, self.dataset_val.class_ids)
         return detections
 
@@ -121,28 +139,27 @@ class LitYOLOX(LightningModule):
             detect_list, self.dataset_val)
         print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
         print(summary)
-        # self.log("metrics/evaluate/mAP", ap50_95, prog_bar=False)
-        # self.log("metrics/evaluate/mAP50", ap50, prog_bar=False)
+        self.log("val/mAP", ap50_95, prog_bar=False)
+        self.log("val/mAP50", ap50, prog_bar=False)
 
     def configure_optimizers(self):
-        # pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
-        # for model in self.models:
-        #     for k, v in model.named_modules():
-        #         if hasattr(v, "bias") and isinstance(v.bias, nn.Parameter):
-        #             pg2.append(v.bias)  # biases
-        #         if isinstance(v, nn.BatchNorm2d) or "bn" in k:
-        #             pg0.append(v.weight)  # no decay
-        #         elif hasattr(v, "weight") and isinstance(v.weight, nn.Parameter):
-        #             pg1.append(v.weight)  # apply decay
-        # optimizer = torch.optim.SGD(
-        #     pg0, lr=0.01, momentum=0.9, nesterov=True
-        # )
-        # optimizer.add_param_group(
-        #     {"params": pg1, "weight_decay": 5e-4}
-        # )  # add pg1 with weight_decay
-        # optimizer.add_param_group({"params": pg2})
+        pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
+        for k, v in self.model.named_modules():
+            if hasattr(v, "bias") and isinstance(v.bias, nn.Parameter):
+                pg2.append(v.bias)  # biases
+            if isinstance(v, nn.BatchNorm2d) or "bn" in k:
+                pg0.append(v.weight)  # no decay
+            elif hasattr(v, "weight") and isinstance(v.weight, nn.Parameter):
+                pg1.append(v.weight)  # apply decay
+        optimizer = torch.optim.SGD(
+            pg0, lr=self.co["learning_rate"], momentum=self.co["momentum"], nesterov=True
+        )
+        optimizer.add_param_group(
+            {"params": pg1, "weight_decay": self.co["weight_decay"]}
+        )  # add pg1 with weight_decay
+        optimizer.add_param_group({"params": pg2})
 
-        optimizer = SGD(self.parameters(), lr=0.03, momentum=0.9)
+        # optimizer = SGD(self.parameters(), lr=self.co["learning_rate"], momentum=self.co["momentum"])
         steps_per_epoch = 1440 // self.train_batch_size
         self.lr_scheduler = CosineWarmupScheduler(
             optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch
@@ -150,34 +167,35 @@ class LitYOLOX(LightningModule):
         return optimizer
 
     def train_dataloader(self):
-        dataset_train = COCODataset(
+        self.dataset_train = COCODataset(
             self.data_dir,
             name=self.train_dir,
             img_size=self.img_size_train,
-            preprocess=TrainTransform(max_labels=50, flip_prob=0, hsv_prob=0),
+            preprocess=TrainTransform(max_labels=50, flip_prob=self.flip_prob, hsv_prob=self.hsv_prob),
             cache=False
         )
-        # dataset_train = MosaicDetection(
-        #     dataset_train,
-        #     mosaic=True,
-        #     img_size=self.img_size_train,
-        #     preprocess=TrainTransform(
-        #         max_labels=120,
-        #         flip_prob=self.flip_prob,
-        #         hsv_prob=self.hsv_prob),
-        #     degrees=self.degrees,
-        #     translate=self.translate,
-        #     mosaic_scale=self.mosaic_scale,
-        #     mixup_scale=self.mixup_scale,
-        #     shear=self.shear,
-        #     perspective=self.perspective,
-        #     enable_mixup=self.enable_mixup,
-        #     mosaic_prob=self.mosaic_prob,
-        #     mixup_prob=self.mixup_prob,
-        # )
+        self.dataset_train = MosaicDetection(
+            self.dataset_train,
+            mosaic=True,
+            img_size=self.img_size_train,
+            preprocess=TrainTransform(
+                max_labels=120,
+                flip_prob=self.flip_prob,
+                hsv_prob=self.hsv_prob),
+            degrees=self.degrees,
+            translate=self.translate,
+            mosaic_scale=self.mosaic_scale,
+            mixup_scale=self.mixup_scale,
+            shear=self.shear,
+            perspective=self.perspective,
+            enable_mixup=self.enable_mixup,
+            mosaic_prob=self.mosaic_prob,
+            mixup_prob=self.mixup_prob,
+        )
 
-        sampler = InfiniteSampler(len(dataset_train), seed=0)
+        # sampler = InfiniteSampler(len(self.dataset_train), seed=0)
         # sampler = SequentialSampler(dataset_train)
+        sampler = RandomSampler(self.dataset_train)
 
         # batch_sampler = YoloBatchSampler(
         #     sampler=sampler,
@@ -185,9 +203,9 @@ class LitYOLOX(LightningModule):
         #     drop_last=False,
         #     mosaic=True,
         # )
-        batch_sampler = BatchSampler(sampler, batch_size=self.train_batch_size, drop_last=False,)
-        train_loader = DataLoader(dataset_train, batch_sampler=batch_sampler,
-                                  num_workers=6, pin_memory=True, shuffle=False)
+        batch_sampler = BatchSampler(sampler, batch_size=self.train_batch_size, drop_last=False)
+        train_loader = DataLoader(self.dataset_train, batch_sampler=batch_sampler,
+                                  num_workers=12, pin_memory=True)
 
         # sampler = torch.utils.data.SequentialSampler(self.dataset_train)
         # train_loader = DataLoader(self.dataset_train, batch_size=self.train_batch_size, sampler=sampler,
@@ -201,10 +219,11 @@ class LitYOLOX(LightningModule):
             name=self.val_dir,
             img_size=self.img_size_val,
             preprocess=ValTransform(legacy=False),
+            cache=False,
         )
         sampler = torch.utils.data.SequentialSampler(self.dataset_val)
         val_loader = DataLoader(self.dataset_val, batch_size=self.val_batch_size, sampler=sampler,
-                                num_workers=4, pin_memory=True, shuffle=False)
+                                num_workers=6, pin_memory=True, shuffle=False)
         return val_loader
 
 

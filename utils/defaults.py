@@ -6,10 +6,10 @@ import argparse
 def argument_parser():
     parser = argparse.ArgumentParser("Joseph's lightning")
     parser.add_argument("-n", "--experiment-name", type=str)
-    parser.add_argument('--cfg', type=str, default='', help='model.yaml path')
-    parser.add_argument("-b", "--batch-size", type=int, default=16, help="batch size")
+    parser.add_argument("-c", "--cfg", type=str, default='', help='model.yaml path')
+    parser.add_argument("-l", "--logger", type=str, default='', help='model.yaml path')
+    # parser.add_argument("-c", "--checkpoint", default=None, type=str, help="checkpoint file")
     parser.add_argument("--resume", default=False, action="store_true", help="resume training")
-    parser.add_argument("-c", "--checkpoint", default=None, type=str, help="checkpoint file")
     return parser
 
 

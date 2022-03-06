@@ -141,14 +141,7 @@ class YOLOXLoss:
         reg_weight = 5.0
         loss = reg_weight * loss_iou + loss_obj + loss_cls + loss_l1
 
-        return (
-            loss,
-            reg_weight * loss_iou,
-            loss_obj,
-            loss_cls,
-            loss_l1,
-            num_fgs / max(num_gts, 1),
-        )
+        return loss, loss_iou, loss_obj, loss_cls, loss_l1, num_fgs / max(num_gts, 1)
 
     def decode(self, inputs):
         preds = []
@@ -165,7 +158,7 @@ class YOLOXLoss:
 
             # Three steps to localize predictions: grid, shifts of x and y, grid with stride
             if self.grids[i].shape[2:4] != pred.shape[2:4]:
-                yv, xv = torch.meshgrid([torch.arange(h), torch.arange(w)])
+                xv, yv = torch.meshgrid([torch.arange(h), torch.arange(w)], indexing='xy')
                 grid = torch.stack((xv, yv), 2).view(1, 1, h, w, 2).type_as(pred)
                 grid = grid.view(1, -1, 2)  # (1, h * w, 2)
                 self.grids[i] = grid

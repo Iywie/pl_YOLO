@@ -14,7 +14,6 @@ class YOLOv5Loss:
         self.balance = balance
 
         self.gr = 1.0
-
         self.BCEcls = None
         self.BCEobj = None
         self.cn = 0.0  # class negative

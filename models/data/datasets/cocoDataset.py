@@ -13,7 +13,7 @@ class COCODataset(Dataset):
             name (str): COCO data name (e.g. 'train2017' or 'val2017')
             img_size (tuple): target image size after pre-processing
             preprocess: data augmentation strategy
-            mosaic(bool):
+            cache(bool):
         """
 
     def __init__(self,
@@ -60,8 +60,8 @@ class COCODataset(Dataset):
         res, img_hw, resized_info, img_name = self.annotations[index]
         # load image from file
         if self.imgs is not None:
-            pad_img = self.imgs[index]
-            img = pad_img[: resized_info[0], : resized_info[1], :].copy()
+            img = self.imgs[index]
+            # img = pad_img[: resized_info[0], : resized_info[1], :].copy()
         else:
             img = self.load_resized_img(index)
 
@@ -133,16 +133,15 @@ class COCODataset(Dataset):
         print(
             "\n********************************************************************************\n"
             "You are using cached images in RAM to accelerate training.\n"
-            "This requires large system RAM.\n"
-            "Make sure you have 200G+ RAM and 136G available disk space for training COCO.\n"
+            "This requires large system RAM. For COCO need 200G+ RAM and 136G available disk space.\n"
             "********************************************************************************\n"
         )
         max_h = self.img_size[0]
         max_w = self.img_size[1]
-        cache_file = self.data_dir + "/img_resized_cache_" + self.name + ".array"
+        cache_file = self.data_dir + "/img_cache_" + self.name + "_" + str(self.img_size[0]) + ".array"
         if not os.path.exists(cache_file):
             print(
-                "Caching images for the first time. This might take about 20 minutes for COCO"
+                "Caching images for the first time."
             )
             self.imgs = np.memmap(
                 cache_file,

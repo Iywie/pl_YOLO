@@ -1,32 +1,48 @@
 # Parameters
+model: "yolov3"
 
-CSPDARKNET:
-    DEPTH: 0.5
-    INPUT_CHANNELS: [32, 64, 128, 256, 512] # five blocks
-    OUT_FEATURES: ["dark3", "dark4", "dark5"]
-    NORM: "bn"
-    ACT: "silu"
+dataset:
+    format: "COCO"
+    dir: 'D:\Code\Datasets\Detection\Steel_NEU\COCO'
+    train: 'train'  # directory name of training image
+    val: 'val'
+    test: 'test'
+    train_size: [224,224]   # [224,224] [416,416]
+    val_size: [224,224]
+    train_batch_size: 64
+    val_batch_size: 64
 
-PAFPN:
-    DEPTH: 0.5
-    INPUT_CHANNELS: [128, 256, 512]
-    NORM: "bn"
-    ACT: "silu"
+backbone:
+    name: "cspdarknet"
+    depth: 0.5
+    input_channels: [32, 64, 128, 256, 512] # five blocks
+    output_features: ["dark3", "dark4", "dark5"]
+    normalization: "bn"
+    activation: "silu"
 
-DECOUPLEDHEAD:
-    CLASSES: 6
+neck:
+    name: "pafpn"
+    depth: 0.5
+    input_channels: [128, 256, 512]
+    normalization: "bn"
+    activation: "silu"
 
-DECODER:
-    ANCHORS: [[[116, 90], [156, 198], [373, 326]],
-              [[30, 61], [62, 45], [59, 119]],
-              [[10, 13], [16, 30], [33, 23]]]
+head:
+    name: "decoupled_head"
+    classes: 6
+    anchors: [ [ [ 116, 90 ], [ 156, 198 ], [ 373, 326 ] ],
+               [ [ 30, 61 ], [ 62, 45 ], [ 59, 119 ] ],
+               [ [ 10, 13 ], [ 16, 30 ], [ 33, 23 ] ] ]
 
-DATASET:
-    DIR: 'D:\Code\Datasets\Detection\Steel_NEU\COCO'
-    TRAIN: 'train.json'  # directory name of training image and the name of json file
-    VAL: 'val.json'
-    TEST: 'test.json'
-    TRAIN_SIZE: [224,224]
-    VAL_SIZE: [224,224]
-    TRAIN_BATCH_SIZE: 16
-    VAL_BATCH_SIZE: 16
+optimizer:
+    name: "SGD"
+    learning_rate: 0.01
+    momentum: 0.9
+    weight_decay: 0.0005
+    lr_scheduler: "CosineWarmupScheduler"
+    warmup: 5
+    ema: false
+
+transform:
+    mosaic_epoch: 50
+

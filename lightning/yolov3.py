@@ -1,8 +1,10 @@
 from pytorch_lightning import LightningModule
 
-import models.backbones as BACKBONE
-import models.necks as NECK
-import models.heads as HEAD
+from models.backbones.darknet_csp import CSPDarkNet
+from models.necks.pafpn import PAFPN
+from models.heads.decoupled_head import DecoupledHead
+from models.heads.yolov3.yolov3_loss import YOLOv3Loss
+from models.detectors.OneStage import OneStageD
 from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
 from models.evaluators.post_process import coco_post
 
@@ -12,76 +14,93 @@ from models.data.data_augments import TrainTransform, ValTransform
 from torch.optim import SGD
 from models.lr_scheduler import CosineWarmupScheduler
 
+from models.utils.ema import ModelEMA
+
 
 class LitYOLOv3(LightningModule):
 
     def __init__(self, cfgs):
         super().__init__()
-        self.backbone_cfgs = cfgs['CSPDARKNET']
-        self.neck_cfgs = cfgs['PAFPN']
-        self.head_cfgs = cfgs['DECOUPLEDHEAD']
-        self.decoder_cfgs = cfgs['DECODER']
-        self.dataset_cfgs = cfgs['DATASET']
+        self.cb = cfgs['backbone']
+        self.cn = cfgs['neck']
+        self.ch = cfgs['head']
+        self.cd = cfgs['dataset']
+        self.co = cfgs['optimizer']
+        self.ct = cfgs['transform']
         # backbone parameters
-        b_depth = self.backbone_cfgs['DEPTH']
-        b_norm = self.backbone_cfgs['NORM']
-        b_act = self.backbone_cfgs['ACT']
-        b_channels = self.backbone_cfgs['INPUT_CHANNELS']
-        out_features = self.backbone_cfgs['OUT_FEATURES']
+        b_depth = self.cb['depth']
+        b_norm = self.cb['normalization']
+        b_act = self.cb['activation']
+        b_channels = self.cb['input_channels']
+        out_features = self.cb['output_features']
         # neck parameters
-        n_depth = self.neck_cfgs['DEPTH']
-        n_channels = self.neck_cfgs['INPUT_CHANNELS']
-        n_norm = self.neck_cfgs['NORM']
-        n_act = self.neck_cfgs['ACT']
+        n_depth = self.cn['depth']
+        n_channels = self.cn['input_channels']
+        n_norm = self.cn['normalization']
+        n_act = self.cn['activation']
         # head parameters
-        self.num_classes = self.head_cfgs['CLASSES']
-        # decoder parameters
-        self.anchors = self.decoder_cfgs['ANCHORS']
+        self.num_classes = self.ch['classes']
+        self.anchors = self.ch['anchors']
         n_anchors = len(self.anchors)
         self.strides = [8, 16, 32]
-        # loss parameters
-        self.use_l1 = False
         # evaluate parameters
         self.nms_threshold = 0.7
         self.confidence_threshold = 0.2
         # dataloader parameters
-        self.data_dir = self.dataset_cfgs['DIR']
-        self.train_dir = self.dataset_cfgs['TRAIN']
-        self.val_dir = self.dataset_cfgs['VAL']
-        self.img_size_train = tuple(self.dataset_cfgs['TRAIN_SIZE'])
-        self.img_size_val = tuple(self.dataset_cfgs['VAL_SIZE'])
-        self.train_batch_size = self.dataset_cfgs['TRAIN_BATCH_SIZE']
-        self.val_batch_size = self.dataset_cfgs['VAL_BATCH_SIZE']
-        self.val_dataset = None
+        self.data_dir = self.cd['dir']
+        self.train_dir = self.cd['train']
+        self.val_dir = self.cd['val']
+        self.img_size_train = tuple(self.cd['train_size'])
+        self.img_size_val = tuple(self.cd['val_size'])
+        self.train_batch_size = self.cd['train_batch_size']
+        self.val_batch_size = self.cd['val_batch_size']
+        self.dataset_val = None
+        self.dataset_train = None
         # Training
-        self.warmup = 3
+        self.warmup = self.co['warmup']
 
-        self.backbone = BACKBONE.CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
-        self.neck = NECK.PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
-        self.head = HEAD.DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
+        self.backbone = CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
+        self.neck = PAFPN(n_depth, out_features, n_channels, n_norm, n_act)
+        self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         self.loss = []
         for i in range(3):
-            self.loss.append(HEAD.YOLOv3Loss(self.anchors[i], self.num_classes, self.img_size_train))
+            self.loss.append(YOLOv3Loss(self.anchors[i], self.num_classes, self.img_size_train))
+
+        self.model = OneStageD(self.backbone, self.neck, self.head)
+        self.ema = self.co['ema']
+        self.ema_model = None
+
+    def on_train_start(self):
+        if self.ema:
+            self.ema_model = ModelEMA(self.model, 0.9998)
+            self.ema_model.updates = len(self.dataset_train) * self.current_epoch
 
     def training_step(self, batch, batch_idx):
         imgs, labels, _, _, _ = batch
-        output = self.backbone(imgs)
-        output = self.neck(output)
-        output = self.head(output)
+        output = self.model(imgs)
         loss = 0
         for i in range(len(output)):
             _loss = self.loss[i](output[i], labels)
             loss += _loss
+        return loss
 
+    def on_train_batch_end(self, outputs, batch, batch_idx, unused=0):
         self.lr_scheduler.step()
         self.log("lr", self.lr_scheduler.optimizer.param_groups[0]['lr'], prog_bar=True)
-        return loss
+        if self.ema:
+            self.ema_model.update(self.model)
+
+    def training_epoch_end(self, outputs):
+        if self.current_epoch > self.mosaic_epoch:
+            self.dataset_train.enable_mosaic = False
 
     def validation_step(self, batch, batch_idx):
         imgs, labels, img_hw, image_id, img_name = batch
-        output = self.backbone(imgs)
-        output = self.neck(output)
-        output = self.head(output)
+        if self.ema:
+            model = self.ema_model.ema
+        else:
+            model = self.model
+        output = model(imgs)
         pred = []
         for i in range(len(output)):
             _loss = self.loss[i](output[i])
