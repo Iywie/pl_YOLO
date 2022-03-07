@@ -1,28 +1,31 @@
 # Parameters
-model: "yolov5"
+model: "yolof"
 
 dataset:
     format: "COCO"
-    dir: 'D:\Code\Datasets\Detection\Steel_NEU\COCO'
+    dir: '/root/autodl-tmp/COCO'
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
-    train_size: [224,224]   # [224,224] [416,416]
+    train_size: [224,224]   # [224,224] [416,416] [640,640]
     val_size: [224,224]
-    train_batch_size: 2
-    val_batch_size: 2
+    train_batch_size: 32
+    val_batch_size: 32
 
 backbone:
     name: "cspdarknet"
     depth: 0.5
     input_channels: [32, 64, 128, 256, 512] # five blocks
-    output_features: ["dark3", "dark4", "dark5"]
+    output_features: ["dark5"]
     normalization: "bn"
     activation: "silu"
 neck:
-    name: "pafpn"
-    depth: 0.5
-    input_channels: [128, 256, 512]
+    name: "dilated_encoder"
+    input_channels: [512]
+    encoder_channels: 512
+    mid_channels: 128
+    num_blocks: 8
+    block_dilations: [ 1, 2, 3, 4, 5, 6, 7, 8 ]
     normalization: "bn"
     activation: "silu"
 head:
@@ -43,4 +46,4 @@ optimizer:
     ema: false
 
 transform:
-    mosaic_epoch: 50
+    mosaic_epoch: 0

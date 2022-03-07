@@ -11,14 +11,11 @@ class PAFPN(nn.Module):
     def __init__(
         self,
         depth=1.0,
-        in_features=("dark3", "dark4", "dark5"),
         in_channels=(256, 512, 1024),
         norm='bn',
         act="silu",
     ):
         super().__init__()
-        self.in_features = in_features
-        self.in_channels = self.in_features
 
         self.shrink_conv1 = BaseConv(in_channels[2], in_channels[1], 1, 1, norm=norm, act=act)
         self.shrink_conv2 = BaseConv(in_channels[1], in_channels[0], 1, 1, norm=norm, act=act)

@@ -133,45 +133,21 @@ class COCODataset(Dataset):
         print(
             "\n********************************************************************************\n"
             "You are using cached images in RAM to accelerate training.\n"
-            "This requires large system RAM. For COCO need 200G+ RAM and 136G available disk space.\n"
+            "This requires large system RAM. For COCO need 200G+ RAM space.\n"
             "********************************************************************************\n"
         )
-        max_h = self.img_size[0]
-        max_w = self.img_size[1]
-        cache_file = self.data_dir + "/img_cache_" + self.name + "_" + str(self.img_size[0]) + ".array"
-        if not os.path.exists(cache_file):
-            print(
-                "Caching images for the first time."
-            )
-            self.imgs = np.memmap(
-                cache_file,
-                shape=(len(self.ids), max_h, max_w, 3),
-                dtype=np.uint8,
-                mode="w+",
-            )
-            from tqdm import tqdm
-            from multiprocessing.pool import ThreadPool
-
-            NUM_THREADs = min(8, os.cpu_count())
-            loaded_images = ThreadPool(NUM_THREADs).imap(
-                lambda x: self.load_resized_img(x),
-                range(len(self.annotations)),
-            )
-            pbar = tqdm(enumerate(loaded_images), total=len(self.annotations))
-            for k, out in pbar:
-                self.imgs[k][: out.shape[0], : out.shape[1], :] = out.copy()
-            self.imgs.flush()
-            pbar.close()
-        else:
-            print(
-                "You are using cached imgs! Make sure your dataset is not changed!!\n"
-                "Everytime the self.input_size is changed in your exp file, you need to delete\n"
-                "the cached data and re-generate them.\n"
-            )
-
-        self.imgs = np.memmap(
-            cache_file,
-            shape=(len(self.ids), max_h, max_w, 3),
-            dtype=np.uint8,
-            mode="r+",
+        self.imgs = [None] * len(self.annotations)
+        from tqdm import tqdm
+        from multiprocessing.pool import ThreadPool
+        gb = 0
+        NUM_THREADs = min(8, os.cpu_count())
+        loaded_images = ThreadPool(NUM_THREADs).imap(
+            lambda x: self.load_resized_img(x),
+            range(len(self.annotations)),
         )
+        pbar = tqdm(enumerate(loaded_images), total=len(self.annotations))
+        for k, out in pbar:
+            self.imgs[k] = out.copy()
+            gb += self.imgs[k].nbytes
+            pbar.desc = f'Caching images ({gb / 1E9:.1f}GB)'
+        pbar.close()

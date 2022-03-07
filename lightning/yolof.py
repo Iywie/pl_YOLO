@@ -1,27 +1,27 @@
 import torch
 import torch.nn as nn
 from pytorch_lightning import LightningModule
-
-from models.data.datasets.cocoDataset import COCODataset
-from torch.utils.data.dataloader import DataLoader
-from models.data.data_augments import TrainTransform, ValTransform
 # Model
 from models.detectors.OneStage import OneStageD
 from models.backbones.darknet_csp import CSPDarkNet
-from models.necks.pafpn import PAFPN
+from models.heads.yolof.dilated_endocer import DilatedEncoder
 from models.heads.decoupled_head import DecoupledHead
-from models.heads.yolov5.yolov5_loss import YOLOv5Loss
-from models.heads.yolov5.yolov5_decoder import YOLOv5Decoder
+from models.heads.yolox.yolox_loss import YOLOXLoss
+from models.heads.yolox.yolox_decoder import YOLOXDecoder
+
 from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
-from models.evaluators.nms_2 import non_max_suppression
+# Data
+from models.data.datasets.cocoDataset import COCODataset
 from models.data.mosaic_detection import MosaicDetection
-from torch.utils.data.sampler import BatchSampler, SequentialSampler, RandomSampler
-from torch.optim import SGD
+from torch.utils.data.dataloader import DataLoader
+from models.data.data_augments import TrainTransform, ValTransform
+from torch.utils.data.sampler import BatchSampler, RandomSampler
 from models.lr_scheduler import CosineWarmupScheduler
 from models.utils.ema import ModelEMA
 
 
-class LitYOLOv5(LightningModule):
+class LitYOLOF(LightningModule):
+
     def __init__(self, cfgs):
         super().__init__()
         self.cb = cfgs['backbone']
@@ -37,17 +37,19 @@ class LitYOLOv5(LightningModule):
         b_channels = self.cb['input_channels']
         out_features = self.cb['output_features']
         # neck parameters
-        n_depth = self.cn['depth']
         n_channels = self.cn['input_channels']
+        ne_channels = self.cn['encoder_channels']
+        nm_channels = self.cn['mid_channels']
+        n_nblock = self.cn['num_blocks']
+        n_dilation = self.cn['block_dilations']
         n_norm = self.cn['normalization']
         n_act = self.cn['activation']
         # head parameters
         self.num_classes = self.ch['classes']
-        self.anchors = self.ch['anchors']
-        n_anchors = len(self.anchors)
-        self.strides = [8, 16, 32]
-        anchor_thre = 4.0
-        balance = [4.0, 1.0, 0.4]
+        n_anchors = 1
+        strides = [8, 16, 32]
+        # loss parameters
+        self.use_l1 = False
         # evaluate parameters
         self.nms_threshold = 0.65
         self.confidence_threshold = 0.01
@@ -61,8 +63,6 @@ class LitYOLOv5(LightningModule):
         self.val_batch_size = self.cd['val_batch_size']
         self.dataset_val = None
         self.dataset_train = None
-        # Training parameters
-        self.warmup = 5
         # --------------- transform config ----------------- #
         self.mosaic_epoch = self.ct['mosaic_epoch']
         self.mosaic_prob = 1.0
@@ -76,17 +76,21 @@ class LitYOLOv5(LightningModule):
         self.shear = 2.0
         self.perspective = 0.0
         self.enable_mixup = True
-        # Model
+        # Training
+        self.warmup = self.co['warmup']
+
         self.backbone = CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
-        self.neck = PAFPN(n_depth, n_channels, n_norm, n_act)
+        self.neck = DilatedEncoder(n_channels, ne_channels, nm_channels, n_nblock, n_dilation, n_norm, n_act)
         self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
-        self.loss = YOLOv5Loss(self.num_classes, self.img_size_train, self.anchors, self.strides,
-                               anchor_thre, balance)
-        self.decoder = YOLOv5Decoder(self.num_classes, self.anchors, self.strides)
+        self.loss = YOLOXLoss(self.num_classes, strides)
+        self.decoder = YOLOXDecoder(self.num_classes, strides)
 
         self.model = OneStageD(self.backbone, self.neck, self.head)
         self.ema = self.co['ema']
         self.ema_model = None
+
+        # self.head.initialize_biases(1e-2)
+        # self.model.apply(initializer)
 
     def on_train_start(self):
         if self.ema:
@@ -96,8 +100,13 @@ class LitYOLOv5(LightningModule):
     def training_step(self, batch, batch_idx):
         imgs, labels, _, _, _ = batch
         output = self.model(imgs)
-        loss, _ = self.loss(output, labels)
+        loss, loss_iou, loss_obj, loss_cls, loss_l1, proportion = self.loss(output, labels)
         self.log("loss/loss", loss, prog_bar=False)
+        self.log("loss/iou", loss_iou, prog_bar=False)
+        self.log("loss/obj", loss_obj, prog_bar=False)
+        self.log("loss/cls", loss_cls, prog_bar=False)
+        self.log("loss/l1", loss_l1, prog_bar=False)
+        self.log("loss/proportion", proportion, prog_bar=False)
         return loss
 
     def on_train_batch_end(self, outputs, batch, batch_idx, unused=0):
@@ -113,19 +122,23 @@ class LitYOLOv5(LightningModule):
             self.dataset_train.enable_mosaic = False
 
     def validation_step(self, batch, batch_idx):
-        imgs, _, img_hw, image_id, img_name = batch
-        output = self.model(imgs)
-        detections = self.decoder(output, self.confidence_threshold, self.nms_threshold, multi_label=False)
-        detections = convert_to_coco_format(detections, image_id, img_hw,
-                                            self.img_size_val, self.dataset_val.class_ids)
+        imgs, labels, img_hw, image_id, img_name = batch
+        if self.ema:
+            model = self.ema_model.ema
+        else:
+            model = self.model
+        output = model(imgs)
+        detections = self.decoder(output, self.confidence_threshold, self.nms_threshold)
+        detections = convert_to_coco_format(detections, image_id, img_hw, self.img_size_val, self.dataset_val.class_ids)
         return detections
 
-    def validation_epoch_end(self, results):
+    def validation_epoch_end(self, validation_step_outputs):
         detect_list = []
-        for i in range(len(results)):
-            detect_list += results[i]
+        for i in range(len(validation_step_outputs)):
+            detect_list += validation_step_outputs[i]
         ap50_95, ap50, summary = COCOEvaluator(
             detect_list, self.dataset_val)
+        print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
         print(summary)
         self.log("val/mAP", ap50_95, prog_bar=False)
         self.log("val/mAP50", ap50, prog_bar=False)
@@ -146,7 +159,8 @@ class LitYOLOv5(LightningModule):
             {"params": pg1, "weight_decay": self.co["weight_decay"]}
         )  # add pg1 with weight_decay
         optimizer.add_param_group({"params": pg2})
-        # optimizer = SGD(self.parameters(), lr=0.01, momentum=0.9, weight_decay=4e-05)
+
+        # optimizer = SGD(self.parameters(), lr=self.co["learning_rate"], momentum=self.co["momentum"])
         steps_per_epoch = 1440 // self.train_batch_size
         self.lr_scheduler = CosineWarmupScheduler(
             optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch
@@ -159,7 +173,7 @@ class LitYOLOv5(LightningModule):
             name=self.train_dir,
             img_size=self.img_size_train,
             preprocess=TrainTransform(max_labels=50, flip_prob=self.flip_prob, hsv_prob=self.hsv_prob),
-            cache=True
+            cache=False
         )
         self.dataset_train = MosaicDetection(
             self.dataset_train,
@@ -190,7 +204,7 @@ class LitYOLOv5(LightningModule):
             self.data_dir,
             name=self.val_dir,
             img_size=self.img_size_val,
-            preprocess=ValTransform(legacy=False, max_labels=50),
+            preprocess=ValTransform(legacy=False),
             cache=False,
         )
         sampler = torch.utils.data.SequentialSampler(self.dataset_val)
@@ -198,3 +212,9 @@ class LitYOLOv5(LightningModule):
                                 num_workers=6, pin_memory=True, shuffle=False)
         return val_loader
 
+
+def initializer(M):
+    for m in M.modules():
+        if isinstance(m, nn.BatchNorm2d):
+            m.eps = 1e-3
+            m.momentum = 0.03

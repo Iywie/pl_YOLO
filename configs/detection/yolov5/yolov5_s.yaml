@@ -1,16 +1,16 @@
 # Parameters
-model: "yolov3"
+model: "yolov5"
 
 dataset:
     format: "COCO"
-    dir: 'D:\Code\Datasets\Detection\Steel_NEU\COCO'
+    dir: '/root/autodl-tmp/COCO'
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
-    train_size: [224,224]   # [224,224] [416,416]
-    val_size: [224,224]
-    train_batch_size: 64
-    val_batch_size: 64
+    train_size: [640,640]   # [224,224] [416,416] [640,640]
+    val_size: [640,640]
+    train_batch_size: 32
+    val_batch_size: 32
 
 backbone:
     name: "cspdarknet"
@@ -19,20 +19,19 @@ backbone:
     output_features: ["dark3", "dark4", "dark5"]
     normalization: "bn"
     activation: "silu"
-
 neck:
     name: "pafpn"
     depth: 0.5
     input_channels: [128, 256, 512]
     normalization: "bn"
     activation: "silu"
-
 head:
     name: "decoupled_head"
     classes: 6
-    anchors: [ [ [ 116, 90 ], [ 156, 198 ], [ 373, 326 ] ],
-               [ [ 30, 61 ], [ 62, 45 ], [ 59, 119 ] ],
-               [ [ 10, 13 ], [ 16, 30 ], [ 33, 23 ] ] ]
+    anchors:
+      - [ [10,13], [16,30], [33,23] ]  # P3/8
+      - [ [30,61], [62,45], [59,119] ]  # P4/16
+      - [ [116,90], [156,198], [373,326] ]  # P5/32
 
 optimizer:
     name: "SGD"
@@ -44,5 +43,4 @@ optimizer:
     ema: false
 
 transform:
-    mosaic_epoch: 50
-
+    mosaic_epoch: 150
