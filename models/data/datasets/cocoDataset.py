@@ -145,7 +145,7 @@ class COCODataset(Dataset):
             lambda x: self.load_resized_img(x),
             range(len(self.annotations)),
         )
-        pbar = tqdm(enumerate(loaded_images), total=len(self.annotations))
+        pbar = tqdm(enumerate(loaded_images), total=len(self.annotations), mininterval=100)
         for k, out in pbar:
             self.imgs[k] = out.copy()
             gb += self.imgs[k].nbytes

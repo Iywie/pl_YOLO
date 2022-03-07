@@ -7,8 +7,8 @@ dataset:
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
-    train_size: [224,224]  # [224,224] [416,416] [640,640]
-    val_size: [224,224]
+    train_size: [416,416]  # [224,224] [416,416] [640,640]
+    val_size: [416,416]
     train_batch_size: 32
     val_batch_size: 32
 
