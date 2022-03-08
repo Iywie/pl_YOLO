@@ -15,7 +15,7 @@ class YOLOXDecoder:
         self.strides = strides
         self.grids = [torch.zeros(1)] * len(strides)
         self.max_det = 300  # maximum number of detections per image
-        self.max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
+        self.max_nms = 10000  # maximum number of boxes into torchvision.ops.nms()
 
     def __call__(self, inputs, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
         preds = []
@@ -73,6 +73,8 @@ class YOLOXDecoder:
             # Detections ordered as (x1, y1, x2, y2, obj_conf, class_conf, class_pred)
             detections = torch.cat((image_pred[:, :5], class_conf, class_pred.float()), 1)
             detections = detections[conf_mask]
+            if detections.shape[0] > self.max_nms:
+                detections = detections[:self.max_nms]
             if not detections.size(0):
                 continue
 

@@ -13,8 +13,12 @@ class YOLOXLoss:
         self.grids = [torch.zeros(1)] * len(strides)
         self.use_l1 = use_l1
 
+        self.iou_loss = IOUloss(reduction="none")
+        self.bcewithlog_loss = nn.BCEWithLogitsLoss(reduction="none")
+        self.l1_loss = nn.L1Loss(reduction="none")
+
     def __call__(self, inputs, labels):
-        preds, x_shifts, y_shifts, expanded_strides = self.decode(inputs)
+        preds, x_shifts, y_shifts, expanded_strides, oriboxes = self.decode(inputs)
 
         bbox_preds = preds[:, :, :4]  # [batch, n_anchors_all, 4]
         obj_preds = preds[:, :, 4].unsqueeze(-1)  # [batch, n_anchors_all, 1]
@@ -108,33 +112,42 @@ class YOLOXLoss:
                 ) * pred_ious_this_matching.unsqueeze(-1)
                 obj_target = fg_mask.unsqueeze(-1)
                 reg_target = gt_bboxes_per_image[matched_gt_inds]
+                if self.use_l1:
+                    l1_target = get_l1_type(preds.new_zeros((num_fg, 4)),
+                                            gt_bboxes_per_image[matched_gt_inds],
+                                            expanded_strides[0][fg_mask],
+                                            x_shifts=x_shifts[0][fg_mask],
+                                            y_shifts=y_shifts[0][fg_mask],)
 
             cls_targets.append(cls_target)
             reg_targets.append(reg_target)
             obj_targets.append(obj_target.type_as(reg_target))
             fg_masks.append(fg_mask)
+            if self.use_l1:
+                l1_targets.append(l1_target)
 
         # all predict anchors of this batch images
         cls_targets = torch.cat(cls_targets, 0)
         reg_targets = torch.cat(reg_targets, 0)
         obj_targets = torch.cat(obj_targets, 0)
         fg_masks = torch.cat(fg_masks, 0)
+        if self.use_l1:
+            l1_targets = torch.cat(l1_targets, 0)
 
         num_fgs = max(num_fgs, 1)
 
-        iou_loss = IOUloss(reduction="none")
-        loss_iou = (iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
 
-        bcewithlog_loss = nn.BCEWithLogitsLoss(reduction="none")
-        loss_obj = (bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)).sum() / num_fgs
+        loss_iou = (self.iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
 
-        loss_cls = (bcewithlog_loss(cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets)).sum() / num_fgs
+
+        loss_obj = (self.bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)).sum() / num_fgs
+
+        loss_cls = (self.bcewithlog_loss(cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets)).sum() / num_fgs
 
         # L1loss is the distance among the four property of a predicted box.
         if self.use_l1:
             # The raw properties are too big like 200-800, need a function to adjust.
-            l1_loss = nn.L1Loss(reduction="none")
-            loss_l1 = (l1_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
+            loss_l1 = (self.l1_loss(oriboxes.view(-1, 4)[fg_masks], l1_targets)).sum() / num_fgs
         else:
             loss_l1 = 0.0
 
@@ -145,6 +158,7 @@ class YOLOXLoss:
 
     def decode(self, inputs):
         preds = []
+        ori_boxes = []
         x_shifts = []
         y_shifts = []
         expanded_strides = []
@@ -174,6 +188,8 @@ class YOLOXLoss:
             pred = pred.permute(0, 1, 3, 4, 2).reshape(
                 batch_size, self.n_anchors * h * w, -1
             )
+            ori_box = pred[..., :4].clone()
+            ori_boxes.append(ori_box)
             # pred: [batch_size, h * w, n_ch]
             pred[..., :2] = (pred[..., :2] + grid) * self.strides[i]
             # The predictions of w and y are logs
@@ -182,7 +198,8 @@ class YOLOXLoss:
 
         # preds: [batch_size, all predictions, n_ch]
         preds = torch.cat(preds, 1)
-        return preds, x_shifts, y_shifts, expanded_strides
+        ori_boxes = torch.cat(ori_boxes, 1)
+        return preds, x_shifts, y_shifts, expanded_strides, ori_boxes
 
 
 def get_in_boxes_info(

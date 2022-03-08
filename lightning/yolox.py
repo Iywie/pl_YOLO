@@ -21,6 +21,7 @@ from torch.utils.data.sampler import BatchSampler, SequentialSampler, RandomSamp
 from torch.optim import SGD
 from models.lr_scheduler import CosineWarmupScheduler
 from models.utils.ema import ModelEMA
+import torchvision.transforms as transforms
 
 
 class LitYOLOX(LightningModule):
@@ -84,6 +85,7 @@ class LitYOLOX(LightningModule):
         self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         self.loss = YOLOXLoss(self.num_classes, strides)
         self.decoder = YOLOXDecoder(self.num_classes, strides)
+        self.test_head = YOLOXHead(self.num_classes, strides, n_channels, n_act)
 
         self.model = OneStageD(self.backbone, self.neck, self.head)
         self.ema = self.co['ema']
@@ -99,6 +101,9 @@ class LitYOLOX(LightningModule):
 
     def training_step(self, batch, batch_idx):
         imgs, labels, _, _, _ = batch
+        # _, _, h, w = imgs.shape
+        # # perform augmentations with YOCO
+        # images = YOCO(imgs, aug, h, w)
         output = self.model(imgs)
         loss, loss_iou, loss_obj, loss_cls, loss_l1, proportion = self.loss(output, labels)
         self.log("loss/loss", loss, prog_bar=False)
@@ -120,6 +125,7 @@ class LitYOLOX(LightningModule):
             self.dataset_train.enable_mosaic = True
         else:
             self.dataset_train.enable_mosaic = False
+            self.loss.use_l1 = True
 
     def validation_step(self, batch, batch_idx):
         imgs, labels, img_hw, image_id, img_name = batch
@@ -173,7 +179,7 @@ class LitYOLOX(LightningModule):
             name=self.train_dir,
             img_size=self.img_size_train,
             preprocess=TrainTransform(max_labels=50, flip_prob=self.flip_prob, hsv_prob=self.hsv_prob),
-            cache=True
+            cache=False
         )
         self.dataset_train = MosaicDetection(
             self.dataset_train,
@@ -205,7 +211,7 @@ class LitYOLOX(LightningModule):
             name=self.val_dir,
             img_size=self.img_size_val,
             preprocess=ValTransform(legacy=False),
-            cache=True,
+            cache=False,
         )
         sampler = torch.utils.data.SequentialSampler(self.dataset_val)
         val_loader = DataLoader(self.dataset_val, batch_size=self.val_batch_size, sampler=sampler,
@@ -218,3 +224,14 @@ def initializer(M):
         if isinstance(m, nn.BatchNorm2d):
             m.eps = 1e-3
             m.momentum = 0.03
+
+
+aug = torch.nn.Sequential(
+            transforms.RandomHorizontalFlip(), )
+
+
+def YOCO(images, aug, h, w):
+    images = torch.cat((aug(images[:, :, :, 0:int(w / 2)]), aug(images[:, :, :, int(w / 2):w])), dim=3) if \
+        torch.rand(1) > 0.5 else torch.cat((aug(images[:, :, 0:int(h / 2), :]), aug(images[:, :, int(h / 2):h, :])),
+                                           dim=2)
+    return images
