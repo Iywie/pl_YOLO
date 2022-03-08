@@ -133,12 +133,9 @@ class YOLOXLoss:
         fg_masks = torch.cat(fg_masks, 0)
         if self.use_l1:
             l1_targets = torch.cat(l1_targets, 0)
-
         num_fgs = max(num_fgs, 1)
 
-
         loss_iou = (self.iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
-
 
         loss_obj = (self.bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)).sum() / num_fgs
 
@@ -146,7 +143,6 @@ class YOLOXLoss:
 
         # L1loss is the distance among the four property of a predicted box.
         if self.use_l1:
-            # The raw properties are too big like 200-800, need a function to adjust.
             loss_l1 = (self.l1_loss(oriboxes.view(-1, 4)[fg_masks], l1_targets)).sum() / num_fgs
         else:
             loss_l1 = 0.0

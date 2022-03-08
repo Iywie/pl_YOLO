@@ -27,51 +27,26 @@ class CSPDarkNet(nn.Module):
         # dark2
         self.dark2 = nn.Sequential(
             BaseConv(channels[0], channels[1], 3, 2, norm=norm, act=act),
-            CSPLayer(
-                channels[1],
-                channels[1],
-                num_bottle=base_depth,
-                norm=norm,
-                act=act,
-            ),
+            CSPLayer(channels[1], channels[1], num_bottle=base_depth, norm=norm, act=act),
         )
 
         # dark3
         self.dark3 = nn.Sequential(
             BaseConv(channels[1], channels[2], 3, 2, norm=norm, act=act),
-            CSPLayer(
-                channels[2],
-                channels[2],
-                num_bottle=base_depth * 3,
-                norm=norm,
-                act=act,
-            ),
+            CSPLayer(channels[2], channels[2], num_bottle=base_depth * 3, norm=norm, act=act),
         )
 
         # dark4
         self.dark4 = nn.Sequential(
             BaseConv(channels[2], channels[3], 3, 2, norm=norm, act=act),
-            CSPLayer(
-                channels[3],
-                channels[3],
-                num_bottle=base_depth * 3,
-                norm=norm,
-                act=act,
-            ),
+            CSPLayer(channels[3], channels[3], num_bottle=base_depth * 3, norm=norm, act=act),
         )
 
         # dark5
         self.dark5 = nn.Sequential(
             BaseConv(channels[3], channels[4], 3, 2, norm=norm, act=act),
             SPPBottleneck(channels[4], channels[4], norm=norm, act=act),
-            CSPLayer(
-                channels[4],
-                channels[4],
-                num_bottle=base_depth,
-                shortcut=False,
-                norm=norm,
-                act=act,
-            ),
+            CSPLayer(channels[4], channels[4], num_bottle=base_depth, shortcut=False, norm=norm, act=act),
         )
 
     def forward(self, x):

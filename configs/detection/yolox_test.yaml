@@ -7,8 +7,8 @@ dataset:
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
-    train_size: [416,416]  # [224,224] [416,416] [640,640]
-    val_size: [416,416]
+    train_size: [224,224]  # [224,224] [416,416] [640,640]
+    val_size: [224,224]
     train_batch_size: 32
     val_batch_size: 32
 
@@ -42,7 +42,7 @@ transform:
     hsv_prob: 1.0
     flip_prob: 0.5
 
-    mosaic_epoch: 100
+    mosaic_epoch: 0
     mosaic_prob: 1.0
     mixup_prob: 1.0
     degrees: 10.0

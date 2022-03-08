@@ -23,6 +23,8 @@ from models.lr_scheduler import CosineWarmupScheduler
 from models.utils.ema import ModelEMA
 import torchvision.transforms as transforms
 
+from models.heads.yolof.yolof_decoupled_head import YOLOFDecoupledHead
+
 
 class LitYOLOX(LightningModule):
 
@@ -82,7 +84,8 @@ class LitYOLOX(LightningModule):
 
         self.backbone = CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = PAFPN(n_depth, n_channels, n_norm, n_act)
-        self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
+        # self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
+        self.head = YOLOFDecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         self.loss = YOLOXLoss(self.num_classes, strides)
         self.decoder = YOLOXDecoder(self.num_classes, strides)
         self.test_head = YOLOXHead(self.num_classes, strides, n_channels, n_act)
@@ -179,7 +182,7 @@ class LitYOLOX(LightningModule):
             name=self.train_dir,
             img_size=self.img_size_train,
             preprocess=TrainTransform(max_labels=50, flip_prob=self.flip_prob, hsv_prob=self.hsv_prob),
-            cache=False
+            cache=True
         )
         self.dataset_train = MosaicDetection(
             self.dataset_train,
