@@ -12,40 +12,39 @@ class TrainTransform:
         self.cutout_prob = cutout_prob
 
     def __call__(self, image, targets, input_dim):
-        boxes = targets[:, :4]
-        labels = targets[:, 4]
-        if len(boxes) == 0:
+
+        if len(targets) == 0:
             targets = np.zeros((self.max_labels, 5), dtype=np.float32)
             image, r_o = preproc(image, input_dim)
             return image, targets
 
         image_process = image.copy()
-        boxes_process = boxes.copy()
+        targets_process = targets.copy()
 
         if random.random() < self.hsv_prob:
             augment_hsv(image_process)
         if random.random() < self.flip_prob:
-            image_process, boxes_process = _mirror(image_process, boxes_process)
+            image_process, targets_process[:, :4] = _mirror(image_process, targets_process[:, :4])
         if random.random() < self.cutout_prob:
-            image_process, boxes_process = cutout(image_process, boxes_process)
+            image_process, boxes_process = cutout(image_process, targets_process)
         image_process, r = preproc(image_process, input_dim)
+
         # boxes [xyxy] 2 [cx,cy,w,h]
-        boxes_process = xyxy2cxcywh(boxes_process)
-        boxes_process *= r
+        targets_process[:, :4] = xyxy2cxcywh(targets_process[:, :4])
+        targets_process[:, :4] *= r
 
-        mask_b = np.minimum(boxes_process[:, 2], boxes_process[:, 3]) > 1
-        boxes_process = boxes_process[mask_b]
-        label_process = labels[mask_b]
+        mask_b = np.minimum(targets_process[:, 2], targets_process[:, 3]) > 1
+        targets_process = targets_process[mask_b]
 
-        if len(boxes_process) == 0:
+        if len(targets_process) == 0:
             image_process, r_o = preproc(image, input_dim)
-            boxes_process = r_o * boxes
-            label_process = labels
-            boxes_process = xyxy2cxcywh(boxes_process)
+            targets_process = targets
+            targets_process[:, :4] = r_o * targets_process[:, :4]
+            targets_process[:, :4] = xyxy2cxcywh(targets_process[:, :4])
 
-        label_process = np.expand_dims(label_process, 1)
+        label_process = np.expand_dims(targets_process[:, 4], 1)
 
-        targets = np.hstack((label_process, boxes_process))
+        targets = np.hstack((label_process, targets_process[:, :4]))
         padded_labels = np.zeros((self.max_labels, 5))
         padded_labels[range(len(targets))[: self.max_labels]] = targets[: self.max_labels]
         padded_labels = np.ascontiguousarray(padded_labels, dtype=np.float32)

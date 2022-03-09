@@ -2,7 +2,7 @@ import random
 import numpy as np
 
 
-def cutout(image, boxes):
+def cutout(image, labels):
     # Applies image cutout augmentation https://arxiv.org/abs/1708.04552
     h, w = image.shape[:2]
 
@@ -22,12 +22,12 @@ def cutout(image, boxes):
         image[ymin:ymax, xmin:xmax] = [random.randint(64, 191) for _ in range(3)]
 
         # return unobscured labels
-        if len(boxes) and s > 0.03:
+        if len(labels) and s > 0.03:
             box = np.array([xmin, ymin, xmax, ymax], dtype=np.float32)
-            ioa = bbox_ioa(box, boxes)  # intersection over area
-            boxes = boxes[ioa < 0.6]  # remove >60% obscured labels
+            ioa = bbox_ioa(box, labels[:, :4])  # intersection over area
+            labels = labels[ioa < 0.6]  # remove >60% obscured labels
 
-    return image, boxes
+    return image, labels
 
 
 def bbox_ioa(box1, box2):

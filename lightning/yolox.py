@@ -180,6 +180,7 @@ class LitYOLOX(LightningModule):
             enable_mixup=self.enable_mixup,
             mosaic_prob=self.mosaic_prob,
             mixup_prob=self.mixup_prob,
+            cutout_prob=self.cutout_prob,
         )
         sampler = RandomSampler(self.dataset_train)
         batch_sampler = BatchSampler(sampler, batch_size=self.train_batch_size, drop_last=False)

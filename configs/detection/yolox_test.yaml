@@ -44,7 +44,7 @@ transform:
     flip_prob: 0.5
     cutout_prob: 0.5
     # Mosaic transform
-    mosaic_epoch: 180
+    mosaic_epoch: 280
     mosaic_prob: 1
     degrees: 10.0
     translate: 0.1
@@ -53,5 +53,5 @@ transform:
     shear: 2.0
     perspective: 0.0
     # CopyPaste in mosaic
-    enable_mixup: true
+    enable_mixup: false
     mixup_prob: 1.0

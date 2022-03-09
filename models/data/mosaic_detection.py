@@ -3,6 +3,7 @@ import cv2
 import math
 import numpy as np
 from torch.utils.data.dataset import Dataset
+from models.data.augmentation.cutout import cutout
 
 
 class MosaicDetection(Dataset):
@@ -10,7 +11,7 @@ class MosaicDetection(Dataset):
             self, dataset, img_size, mosaic=True, preprocess=None,
             degrees=10, translate=0.1, mosaic_scale=(0.5, 1.5),
             mixup_scale=(0.5, 1.5), shear=2.0, perspective=0.0,
-            enable_mixup=True, mosaic_prob=1.0, mixup_prob=1.0,
+            enable_mixup=True, mosaic_prob=1.0, mixup_prob=1.0, cutout_prob=0.0
     ):
         """
         Args:
@@ -41,6 +42,7 @@ class MosaicDetection(Dataset):
         self.enable_mixup = enable_mixup
         self.mosaic_prob = mosaic_prob
         self.mixup_prob = mixup_prob
+        self.cutout_prob = cutout_prob
 
     def __len__(self):
         return len(self._dataset)
@@ -115,6 +117,12 @@ class MosaicDetection(Dataset):
             # -----------------------------------------------------------------
             if self.enable_mixup and not len(mosaic_labels) == 0 and random.random() < self.mixup_prob:
                 mosaic_img, mosaic_labels = self.mixup(mosaic_img, mosaic_labels, self.img_size)
+            # -----------------------------------------------------------------
+            # Cutout
+            # -----------------------------------------------------------------
+            if random.random() < self.cutout_prob:
+                mosaic_img, mosaic_labels = cutout(mosaic_img, mosaic_labels)
+
             mix_img, padded_labels = self.preprocess(mosaic_img, mosaic_labels, self.img_size)
             img_info = (mix_img.shape[1], mix_img.shape[2])
             return mix_img, padded_labels, img_info, np.array([idx]), img_name
