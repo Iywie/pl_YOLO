@@ -5,19 +5,16 @@ from pytorch_lightning import LightningModule
 from models.detectors.OneStage import OneStageD
 from models.backbones.darknet_csp import CSPDarkNet
 from models.necks.pafpn import PAFPN
-from models.heads.decoupled_head import DecoupledHead
 from models.heads.yolox.yolox_loss import YOLOXLoss
 from models.heads.yolox.yolox_decoder import YOLOXDecoder
-from models.heads.yolox.yolox_head import YOLOXHead
 
 from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
 # Data
 from models.data.datasets.cocoDataset import COCODataset
-from models.data.samplers import InfiniteSampler, YoloBatchSampler
 from models.data.mosaic_detection import MosaicDetection
 from torch.utils.data.dataloader import DataLoader
-from models.data.data_augments import TrainTransform, ValTransform
-from torch.utils.data.sampler import BatchSampler, SequentialSampler, RandomSampler
+from models.data.augmentation.data_augments import TrainTransform, ValTransform
+from torch.utils.data.sampler import BatchSampler, RandomSampler
 from torch.optim import SGD
 from models.lr_scheduler import CosineWarmupScheduler
 from models.utils.ema import ModelEMA
@@ -66,6 +63,7 @@ class LitYOLOX(LightningModule):
         self.val_batch_size = self.cd['val_batch_size']
         self.dataset_val = None
         self.dataset_train = None
+        self.lr_scheduler = None
         # --------------- transform config ----------------- #
         self.mosaic_epoch = self.ct['mosaic_epoch']
         self.mosaic_prob = self.ct['mosaic_prob']
@@ -88,7 +86,6 @@ class LitYOLOX(LightningModule):
         self.head = YOLOFDecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         self.loss = YOLOXLoss(self.num_classes, strides)
         self.decoder = YOLOXDecoder(self.num_classes, strides)
-        self.test_head = YOLOXHead(self.num_classes, strides, n_channels, n_act)
 
         self.model = OneStageD(self.backbone, self.neck, self.head)
         self.ema = self.co['ema']
@@ -129,6 +126,8 @@ class LitYOLOX(LightningModule):
         else:
             self.dataset_train.enable_mosaic = False
             self.loss.use_l1 = True
+        if self.trainer.max_epochs - self.current_epoch < 15:
+            self.trainer.check_val_every_n_epoch = 1
 
     def validation_step(self, batch, batch_idx):
         imgs, labels, img_hw, image_id, img_name = batch
@@ -152,30 +151,6 @@ class LitYOLOX(LightningModule):
         self.log("val/mAP", ap50_95, prog_bar=False)
         self.log("val/mAP50", ap50, prog_bar=False)
 
-    def configure_optimizers(self):
-        # pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
-        # for k, v in self.model.named_modules():
-        #     if hasattr(v, "bias") and isinstance(v.bias, nn.Parameter):
-        #         pg2.append(v.bias)  # biases
-        #     if isinstance(v, nn.BatchNorm2d) or "bn" in k:
-        #         pg0.append(v.weight)  # no decay
-        #     elif hasattr(v, "weight") and isinstance(v.weight, nn.Parameter):
-        #         pg1.append(v.weight)  # apply decay
-        # optimizer = torch.optim.SGD(
-        #     pg0, lr=self.co["learning_rate"], momentum=self.co["momentum"], nesterov=True
-        # )
-        # optimizer.add_param_group(
-        #     {"params": pg1, "weight_decay": self.co["weight_decay"]}
-        # )  # add pg1 with weight_decay
-        # optimizer.add_param_group({"params": pg2})
-
-        optimizer = SGD(self.parameters(), lr=self.co["learning_rate"], momentum=self.co["momentum"])
-        steps_per_epoch = 1440 // self.train_batch_size
-        self.lr_scheduler = CosineWarmupScheduler(
-            optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch
-        )
-        return optimizer
-
     def train_dataloader(self):
         self.dataset_train = COCODataset(
             self.data_dir,
@@ -189,7 +164,7 @@ class LitYOLOX(LightningModule):
             mosaic=False,
             img_size=self.img_size_train,
             preprocess=TrainTransform(
-                max_labels=120,
+                max_labels=100,
                 flip_prob=self.flip_prob,
                 hsv_prob=self.hsv_prob),
             degrees=self.degrees,
@@ -220,6 +195,30 @@ class LitYOLOX(LightningModule):
         val_loader = DataLoader(self.dataset_val, batch_size=self.val_batch_size, sampler=sampler,
                                 num_workers=6, pin_memory=True, shuffle=False)
         return val_loader
+
+    def configure_optimizers(self):
+        # pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
+        # for k, v in self.model.named_modules():
+        #     if hasattr(v, "bias") and isinstance(v.bias, nn.Parameter):
+        #         pg2.append(v.bias)  # biases
+        #     if isinstance(v, nn.BatchNorm2d) or "bn" in k:
+        #         pg0.append(v.weight)  # no decay
+        #     elif hasattr(v, "weight") and isinstance(v.weight, nn.Parameter):
+        #         pg1.append(v.weight)  # apply decay
+        # optimizer = torch.optim.SGD(
+        #     pg0, lr=self.co["learning_rate"], momentum=self.co["momentum"], nesterov=True
+        # )
+        # optimizer.add_param_group(
+        #     {"params": pg1, "weight_decay": self.co["weight_decay"]}
+        # )  # add pg1 with weight_decay
+        # optimizer.add_param_group({"params": pg2})
+
+        optimizer = SGD(self.parameters(), lr=self.co["learning_rate"], momentum=self.co["momentum"])
+        steps_per_epoch = 1440 // self.train_batch_size
+        self.lr_scheduler = CosineWarmupScheduler(
+            optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch * 1.5
+        )
+        return optimizer
 
 
 def initializer(M):

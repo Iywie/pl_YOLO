@@ -28,7 +28,7 @@ def COCOEvaluator(data_dict, val_dataset):
         info = redirect_string.getvalue()
         return cocoEval.stats[0], cocoEval.stats[1], info
     else:
-        return 0, 0, None
+        return 0.0, 0.0, None
 
 
 def convert_to_coco_format(outputs, ids, hws, val_size, class_ids):

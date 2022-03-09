@@ -4,7 +4,7 @@ from pytorch_lightning import LightningModule
 
 from models.data.datasets.cocoDataset import COCODataset
 from torch.utils.data.dataloader import DataLoader
-from models.data.data_augments import TrainTransform, ValTransform
+from models.data.augmentation.data_augments import TrainTransform, ValTransform
 # Model
 from models.detectors.OneStage import OneStageD
 from models.backbones.darknet_csp import CSPDarkNet
@@ -13,10 +13,8 @@ from models.heads.decoupled_head import DecoupledHead
 from models.heads.yolov5.yolov5_loss import YOLOv5Loss
 from models.heads.yolov5.yolov5_decoder import YOLOv5Decoder
 from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
-from models.evaluators.nms_2 import non_max_suppression
 from models.data.mosaic_detection import MosaicDetection
-from torch.utils.data.sampler import BatchSampler, SequentialSampler, RandomSampler
-from torch.optim import SGD
+from torch.utils.data.sampler import BatchSampler, RandomSampler
 from models.lr_scheduler import CosineWarmupScheduler
 from models.utils.ema import ModelEMA
 

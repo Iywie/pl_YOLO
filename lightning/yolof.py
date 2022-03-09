@@ -14,7 +14,7 @@ from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
 from models.data.datasets.cocoDataset import COCODataset
 from models.data.mosaic_detection import MosaicDetection
 from torch.utils.data.dataloader import DataLoader
-from models.data.data_augments import TrainTransform, ValTransform
+from models.data.augmentation.data_augments import TrainTransform, ValTransform
 from torch.utils.data.sampler import BatchSampler, RandomSampler
 from models.lr_scheduler import CosineWarmupScheduler
 from models.utils.ema import ModelEMA

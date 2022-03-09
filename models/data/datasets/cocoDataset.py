@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from models.data.datasets.pycocotools.coco import COCO
 from torch.utils.data.dataset import Dataset
+from models.utils.bbox import xyxy2cxcywh
 
 
 class COCODataset(Dataset):

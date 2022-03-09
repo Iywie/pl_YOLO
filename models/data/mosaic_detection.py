@@ -120,7 +120,7 @@ class MosaicDetection(Dataset):
             ):
                 mosaic_img, mosaic_labels = self.mixup(mosaic_img, mosaic_labels, self.img_size)
             mix_img, padded_labels = self.preprocess(mosaic_img, mosaic_labels, self.img_size)
-            img_info = (mix_img.shape[1], mix_img.shape[0])
+            img_info = (mix_img.shape[1], mix_img.shape[2])
 
             return mix_img, padded_labels, img_info, np.array([idx]), img_name
 

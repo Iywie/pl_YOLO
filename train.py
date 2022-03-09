@@ -22,7 +22,7 @@ def main():
     trainer = Trainer(
         # tpu_cores=8,
         gpus=1,
-        max_epochs=300,
+        max_epochs=200,
         check_val_every_n_epoch=5,
         log_every_n_steps=10,
         enable_progress_bar=True,

@@ -10,7 +10,7 @@ from models.evaluators.post_process import coco_post
 
 from models.data.datasets.cocoDataset import COCODataset
 from torch.utils.data.dataloader import DataLoader
-from models.data.data_augments import TrainTransform, ValTransform
+from models.data.augmentation.data_augments import TrainTransform, ValTransform
 from torch.optim import SGD
 from models.lr_scheduler import CosineWarmupScheduler
 
