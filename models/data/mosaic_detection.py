@@ -10,7 +10,7 @@ class MosaicDetection(Dataset):
             self, dataset, img_size, mosaic=True, preprocess=None,
             degrees=10, translate=0.1, mosaic_scale=(0.5, 1.5),
             mixup_scale=(0.5, 1.5), shear=2.0, perspective=0.0,
-            enable_mixup=True, mosaic_prob=1.0, mixup_prob=1.0, *args
+            enable_mixup=True, mosaic_prob=1.0, mixup_prob=1.0,
     ):
         """
         Args:
@@ -113,15 +113,10 @@ class MosaicDetection(Dataset):
             # -----------------------------------------------------------------
             # CopyPaste: https://arxiv.org/abs/2012.07177
             # -----------------------------------------------------------------
-            if (
-                    self.enable_mixup
-                    and not len(mosaic_labels) == 0
-                    and random.random() < self.mixup_prob
-            ):
+            if self.enable_mixup and not len(mosaic_labels) == 0 and random.random() < self.mixup_prob:
                 mosaic_img, mosaic_labels = self.mixup(mosaic_img, mosaic_labels, self.img_size)
             mix_img, padded_labels = self.preprocess(mosaic_img, mosaic_labels, self.img_size)
             img_info = (mix_img.shape[1], mix_img.shape[2])
-
             return mix_img, padded_labels, img_info, np.array([idx]), img_name
 
         else:
@@ -254,6 +249,7 @@ def random_perspective(
     perspective=0.0,
     border=(0, 0),
 ):
+    # Affine Transform: Rotation, Scale, Shear, Translation
     # targets = [cls, xyxy]
     height = img.shape[0] + border[0] * 2  # shape(h,w,c)
     width = img.shape[1] + border[1] * 2

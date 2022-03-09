@@ -39,16 +39,19 @@ optimizer:
     ema: true
 
 transform:
+    # Train transform
     hsv_prob: 0
     flip_prob: 0.5
-
+    cutout_prob: 0.5
+    # Mosaic transform
     mosaic_epoch: 180
-    mosaic_prob: 0.5
-    mixup_prob: 1.0
+    mosaic_prob: 1
     degrees: 10.0
     translate: 0.1
     mosaic_scale: [0.1, 2]
     mixup_scale: [0.5, 1.5]
     shear: 2.0
     perspective: 0.0
+    # CopyPaste in mosaic
     enable_mixup: true
+    mixup_prob: 1.0

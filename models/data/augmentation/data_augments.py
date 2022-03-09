@@ -1,59 +1,111 @@
 import cv2
 import random
 import numpy as np
+from models.data.augmentation.cutout import cutout
 
 
 class TrainTransform:
-    def __init__(self, max_labels=50, flip_prob=0.5, hsv_prob=1.0):
+    def __init__(self, max_labels=50, flip_prob=0.5, hsv_prob=1.0, cutout_prob=0):
         self.max_labels = max_labels
         self.flip_prob = flip_prob
         self.hsv_prob = hsv_prob
+        self.cutout_prob = cutout_prob
 
     def __call__(self, image, targets, input_dim):
-        boxes = targets[:, :4].copy()
-        labels = targets[:, 4].copy()
+        boxes = targets[:, :4]
+        labels = targets[:, 4]
         if len(boxes) == 0:
             targets = np.zeros((self.max_labels, 5), dtype=np.float32)
             image, r_o = preproc(image, input_dim)
             return image, targets
 
-        image_t = image.copy()
-        targets_t = targets.copy()
-        height_o, width_o, _ = image.shape
-        boxes_o = targets[:, :4]
-        labels_o = targets[:, 4]
-        # bbox_o: [xyxy] to [c_x,c_y,w,h]
-        boxes_o = xyxy2cxcywh(boxes_o)
+        image_process = image.copy()
+        boxes_process = boxes.copy()
 
         if random.random() < self.hsv_prob:
-            augment_hsv(image)
+            augment_hsv(image_process)
         if random.random() < self.flip_prob:
-            image_t, boxes = _mirror(image_t, boxes)
-
-        image_t, r = preproc(image_t, input_dim)
+            image_process, boxes_process = _mirror(image_process, boxes_process)
+        if random.random() < self.cutout_prob:
+            image_process, boxes_process = cutout(image_process, boxes_process)
+        image_process, r = preproc(image_process, input_dim)
         # boxes [xyxy] 2 [cx,cy,w,h]
-        boxes = xyxy2cxcywh(boxes)
-        boxes *= r
+        boxes_process = xyxy2cxcywh(boxes_process)
+        boxes_process *= r
 
-        mask_b = np.minimum(boxes[:, 2], boxes[:, 3]) > 1
-        boxes_t = boxes[mask_b]
-        labels_t = labels[mask_b]
+        mask_b = np.minimum(boxes_process[:, 2], boxes_process[:, 3]) > 1
+        boxes_process = boxes_process[mask_b]
+        label_process = labels[mask_b]
 
-        if len(boxes_t) == 0:
-            image_t, r_o = preproc(image, input_dim)
-            boxes_o *= r_o
-            boxes_t = boxes_o
-            labels_t = labels_o
+        if len(boxes_process) == 0:
+            image_process, r_o = preproc(image, input_dim)
+            boxes_process = r_o * boxes
+            label_process = labels
+            boxes_process = xyxy2cxcywh(boxes_process)
 
-        labels_t = np.expand_dims(labels_t, 1)
+        label_process = np.expand_dims(label_process, 1)
 
-        targets_t = np.hstack((labels_t, boxes_t))
+        targets = np.hstack((label_process, boxes_process))
         padded_labels = np.zeros((self.max_labels, 5))
-        padded_labels[range(len(targets_t))[: self.max_labels]] = targets_t[
-            : self.max_labels
-        ]
+        padded_labels[range(len(targets))[: self.max_labels]] = targets[: self.max_labels]
         padded_labels = np.ascontiguousarray(padded_labels, dtype=np.float32)
-        return image_t, padded_labels
+        return image_process, padded_labels
+
+
+# class TrainTransform:
+#     def __init__(self, max_labels=50, flip_prob=0.5, hsv_prob=1.0, cutout_prob=0):
+#         self.max_labels = max_labels
+#         self.flip_prob = flip_prob
+#         self.hsv_prob = hsv_prob
+#         self.cutout_prob = cutout_prob
+#
+#     def __call__(self, image, targets, input_dim):
+#         boxes = targets[:, :4].copy()
+#         labels = targets[:, 4].copy()
+#         if len(boxes) == 0:
+#             targets = np.zeros((self.max_labels, 5), dtype=np.float32)
+#             image, r_o = preproc(image, input_dim)
+#             return image, targets
+#
+#         image_t = image.copy()
+#         targets_t = targets.copy()
+#         height_o, width_o, _ = image.shape
+#         boxes_o = targets[:, :4]
+#         labels_o = targets[:, 4]
+#         # bbox_o: [xyxy] to [c_x,c_y,w,h]
+#         boxes_o = xyxy2cxcywh(boxes_o)
+#
+#         if random.random() < self.hsv_prob:
+#             augment_hsv(image)
+#         if random.random() < self.flip_prob:
+#             image_t, boxes = _mirror(image_t, boxes)
+#         if random.random() < self.cutout_prob:
+#             image_t, boxes = cutout(image_t, boxes)
+#
+#         image_t, r = preproc(image_t, input_dim)
+#         # boxes [xyxy] 2 [cx,cy,w,h]
+#         boxes = xyxy2cxcywh(boxes)
+#         boxes *= r
+#
+#         mask_b = np.minimum(boxes[:, 2], boxes[:, 3]) > 1
+#         boxes_t = boxes[mask_b]
+#         labels_t = labels[mask_b]
+#
+#         if len(boxes_t) == 0:
+#             image_t, r_o = preproc(image, input_dim)
+#             boxes_o *= r_o
+#             boxes_t = boxes_o
+#             labels_t = labels_o
+#
+#         labels_t = np.expand_dims(labels_t, 1)
+#
+#         targets_t = np.hstack((labels_t, boxes_t))
+#         padded_labels = np.zeros((self.max_labels, 5))
+#         padded_labels[range(len(targets_t))[: self.max_labels]] = targets_t[
+#                                                                   : self.max_labels
+#                                                                   ]
+#         padded_labels = np.ascontiguousarray(padded_labels, dtype=np.float32)
+#         return image_t, padded_labels
 
 
 class ValTransform:
