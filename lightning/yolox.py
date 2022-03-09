@@ -77,6 +77,7 @@ class LitYOLOX(LightningModule):
         self.shear = self.ct['shear']
         self.perspective = self.ct['perspective']
         self.enable_mixup = self.ct['enable_mixup']
+        self.cutout_prob = self.ct['cutout_prob']
         # Training
         self.warmup = self.co['warmup']
 
@@ -156,7 +157,9 @@ class LitYOLOX(LightningModule):
             self.data_dir,
             name=self.train_dir,
             img_size=self.img_size_train,
-            preprocess=TrainTransform(max_labels=50, flip_prob=self.flip_prob, hsv_prob=self.hsv_prob),
+            preprocess=TrainTransform(
+                max_labels=50, flip_prob=self.flip_prob, hsv_prob=self.hsv_prob, cutout_prob=self.cutout_prob
+            ),
             cache=True
         )
         self.dataset_train = MosaicDetection(
@@ -166,7 +169,8 @@ class LitYOLOX(LightningModule):
             preprocess=TrainTransform(
                 max_labels=100,
                 flip_prob=self.flip_prob,
-                hsv_prob=self.hsv_prob),
+                hsv_prob=self.hsv_prob,
+                cutout_prob=self.cutout_prob),
             degrees=self.degrees,
             translate=self.translate,
             mosaic_scale=self.mosaic_scale,
@@ -229,7 +233,7 @@ def initializer(M):
 
 
 aug = torch.nn.Sequential(
-            transforms.RandomHorizontalFlip(), )
+    transforms.RandomHorizontalFlip(), )
 
 
 def YOCO(images, aug, h, w):

@@ -21,8 +21,8 @@ def main():
     # https://pytorch-lightning.readthedocs.io/en/latest/api/pytorch_lightning.trainer.trainer.Trainer.html?highlight=trainer
     trainer = Trainer(
         # tpu_cores=8,
-        # gpus=1,
-        max_epochs=200,
+        gpus=1,
+        max_epochs=300,
         check_val_every_n_epoch=5,
         log_every_n_steps=10,
         enable_progress_bar=True,
@@ -34,8 +34,8 @@ def main():
         # callbacks=[device_stats],
         # default_root_dir="lightning_logs",
         # detect_anomaly=True,
-        limit_train_batches=3,
-        limit_val_batches=2,
+        # limit_train_batches=3,
+        # limit_val_batches=2,
         # reload_dataloaders_every_n_epochs=10,
     )
 
