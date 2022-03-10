@@ -5,6 +5,7 @@ from pytorch_lightning import LightningModule
 from models.detectors.OneStage import OneStageD
 from models.backbones.darknet_csp import CSPDarkNet
 from models.necks.pafpn import PAFPN
+from models.heads.decoupled_head import DecoupledHead
 from models.heads.yolox.yolox_loss import YOLOXLoss
 from models.heads.yolox.yolox_decoder import YOLOXDecoder
 
@@ -158,7 +159,7 @@ class LitYOLOX(LightningModule):
             name=self.train_dir,
             img_size=self.img_size_train,
             preprocess=TrainTransform(
-                max_labels=50, flip_prob=self.flip_prob, hsv_prob=self.hsv_prob, cutout_prob=self.cutout_prob
+                max_labels=50, flip_prob=self.flip_prob, hsv_prob=self.hsv_prob
             ),
             cache=True
         )
@@ -169,8 +170,7 @@ class LitYOLOX(LightningModule):
             preprocess=TrainTransform(
                 max_labels=100,
                 flip_prob=self.flip_prob,
-                hsv_prob=self.hsv_prob,
-                cutout_prob=self.cutout_prob),
+                hsv_prob=self.hsv_prob,),
             degrees=self.degrees,
             translate=self.translate,
             mosaic_scale=self.mosaic_scale,

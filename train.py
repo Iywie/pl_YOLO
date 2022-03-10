@@ -35,7 +35,7 @@ def main():
         # default_root_dir="lightning_logs",
         # detect_anomaly=True,
         # limit_train_batches=3,
-        # limit_val_batches=2,
+        # limit_val_batches=0,
         # reload_dataloaders_every_n_epochs=10,
     )
 

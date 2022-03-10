@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from models.data.datasets.pycocotools.coco import COCO
 from torch.utils.data.dataset import Dataset
+from models.data.augmentation.background import getBackground
 from models.utils.bbox import xyxy2cxcywh
 
 
@@ -38,6 +39,9 @@ class COCODataset(Dataset):
         self.imgs = None
         if cache:
             self._cache_images()
+        else:
+            self.imgs = self._load_imgs()
+        self.back_imgs, self.back_blocks = getBackground(self.imgs, self.annotations, self.img_size)
 
     def __len__(self):
         return len(self.ids)
@@ -112,6 +116,9 @@ class COCODataset(Dataset):
         )
 
         return res, img_hw, resized_hw, file_name
+
+    def _load_imgs(self):
+        return [self.load_resized_img(_id) for _id in self.ids]
 
     def load_resized_img(self, index):
         img = self.load_image(index)

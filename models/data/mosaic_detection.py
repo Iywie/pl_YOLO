@@ -121,7 +121,7 @@ class MosaicDetection(Dataset):
             # Cutout
             # -----------------------------------------------------------------
             if random.random() < self.cutout_prob:
-                mosaic_img, mosaic_labels = cutout(mosaic_img, mosaic_labels)
+                mosaic_img, mosaic_labels = cutout(mosaic_img, mosaic_labels, background=self._dataset.back_blocks)
 
             mix_img, padded_labels = self.preprocess(mosaic_img, mosaic_labels, self.img_size)
             img_info = (mix_img.shape[1], mix_img.shape[2])
@@ -166,7 +166,7 @@ class MosaicDetection(Dataset):
         )
 
         cp_img[
-            : int(img.shape[0] * cp_scale_ratio), : int(img.shape[1] * cp_scale_ratio)
+        : int(img.shape[0] * cp_scale_ratio), : int(img.shape[1] * cp_scale_ratio)
         ] = resized_img
 
         cp_img = cv2.resize(
@@ -191,15 +191,15 @@ class MosaicDetection(Dataset):
         if padded_img.shape[1] > target_w:
             x_offset = random.randint(0, padded_img.shape[1] - target_w - 1)
         padded_cropped_img = padded_img[
-            y_offset: y_offset + target_h, x_offset: x_offset + target_w
-        ]
+                             y_offset: y_offset + target_h, x_offset: x_offset + target_w
+                             ]
 
         cp_bboxes_origin_np = adjust_box_anns(
             cp_labels[:, :4].copy(), cp_scale_ratio, 0, 0, origin_w, origin_h
         )
         if FLIP:
             cp_bboxes_origin_np[:, 0::2] = (
-                origin_w - cp_bboxes_origin_np[:, 0::2][:, ::-1]
+                    origin_w - cp_bboxes_origin_np[:, 0::2][:, ::-1]
             )
         cp_bboxes_transformed_np = cp_bboxes_origin_np.copy()
         cp_bboxes_transformed_np[:, 0::2] = np.clip(
@@ -248,14 +248,14 @@ def get_mosaic_coordinate(mosaic_image, mosaic_index, xc, yc, w, h, input_h, inp
 
 
 def random_perspective(
-    img,
-    targets=(),
-    degrees=10,
-    translate=0.1,
-    scale=0.1,
-    shear=10,
-    perspective=0.0,
-    border=(0, 0),
+        img,
+        targets=(),
+        degrees=10,
+        translate=0.1,
+        scale=0.1,
+        shear=10,
+        perspective=0.0,
+        border=(0, 0),
 ):
     # Affine Transform: Rotation, Scale, Shear, Translation
     # targets = [cls, xyxy]
@@ -283,10 +283,10 @@ def random_perspective(
     # Translation
     T = np.eye(3)
     T[0, 2] = (
-        random.uniform(0.5 - translate, 0.5 + translate) * width
+            random.uniform(0.5 - translate, 0.5 + translate) * width
     )  # x translation (pixels)
     T[1, 2] = (
-        random.uniform(0.5 - translate, 0.5 + translate) * height
+            random.uniform(0.5 - translate, 0.5 + translate) * height
     )  # y translation (pixels)
 
     # Combined rotation matrix
@@ -347,8 +347,8 @@ def box_candidates(box1, box2, wh_thr=2, ar_thr=20, area_thr=0.2):
     w2, h2 = box2[2] - box2[0], box2[3] - box2[1]
     ar = np.maximum(w2 / (h2 + 1e-16), h2 / (w2 + 1e-16))  # aspect ratio
     return (
-        (w2 > wh_thr)
-        & (h2 > wh_thr)
-        & (w2 * h2 / (w1 * h1 + 1e-16) > area_thr)
-        & (ar < ar_thr)
+            (w2 > wh_thr)
+            & (h2 > wh_thr)
+            & (w2 * h2 / (w1 * h1 + 1e-16) > area_thr)
+            & (ar < ar_thr)
     )  # candidates

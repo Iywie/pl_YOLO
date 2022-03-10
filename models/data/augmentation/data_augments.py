@@ -1,15 +1,13 @@
 import cv2
 import random
 import numpy as np
-from models.data.augmentation.cutout import cutout
 
 
 class TrainTransform:
-    def __init__(self, max_labels=50, flip_prob=0.5, hsv_prob=1.0, cutout_prob=0):
+    def __init__(self, max_labels=50, flip_prob=0.5, hsv_prob=1.0):
         self.max_labels = max_labels
         self.flip_prob = flip_prob
         self.hsv_prob = hsv_prob
-        self.cutout_prob = cutout_prob
 
     def __call__(self, image, targets, input_dim):
 
@@ -25,8 +23,6 @@ class TrainTransform:
             augment_hsv(image_process)
         if random.random() < self.flip_prob:
             image_process, targets_process[:, :4] = _mirror(image_process, targets_process[:, :4])
-        if random.random() < self.cutout_prob:
-            image_process, boxes_process = cutout(image_process, targets_process)
         image_process, r = preproc(image_process, input_dim)
 
         # boxes [xyxy] 2 [cx,cy,w,h]
