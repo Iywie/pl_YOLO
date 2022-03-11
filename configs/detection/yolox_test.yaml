@@ -43,17 +43,18 @@ transform:
     hsv_prob: 0
     flip_prob: 0.5
     # Mosaic transform
-    mosaic_epoch: 170
-    mosaic_prob: 1
+    mosaic_epoch: 280
+    mosaic_prob: 0.9
     # Affine transform after mosaic
     degrees: 10.0
     translate: 0.1
     mosaic_scale: [0.1, 2]
-    mixup_scale: [0.5, 1.5]
+    copypaste_scale: [0.5, 1.5]
     shear: 2.0
     perspective: 0.0
     # CopyPaste in mosaic
-    enable_mixup: false
-    mixup_prob: 1.0
+    enable_copypaste: true
+    mixup_prob: 0
+    cutpaste_prob: 0.5
     # CutOut in mosaic
     cutout_prob: 0

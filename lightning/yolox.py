@@ -17,11 +17,10 @@ from models.data.mosaic_detection import MosaicDetection
 from torch.utils.data.dataloader import DataLoader
 from models.data.augmentation.data_augments import TrainTransform, ValTransform
 from torch.utils.data.sampler import BatchSampler, RandomSampler
-from torch.optim import SGD
+from torch.optim import SGD, AdamW, Adam
 from models.lr_scheduler import CosineWarmupScheduler
 from models.utils.ema import ModelEMA
 import torchvision.transforms as transforms
-
 from models.heads.yolof.yolof_decoupled_head import YOLOFDecoupledHead
 
 
@@ -65,20 +64,21 @@ class LitYOLOX(LightningModule):
         self.val_batch_size = self.cd['val_batch_size']
         self.dataset_val = None
         self.dataset_train = None
-        self.lr_scheduler = None
         # --------------- transform config ----------------- #
         self.mosaic_epoch = self.ct['mosaic_epoch']
         self.mosaic_prob = self.ct['mosaic_prob']
-        self.mixup_prob = self.ct['mixup_prob']
         self.hsv_prob = self.ct['hsv_prob']
         self.flip_prob = self.ct['flip_prob']
         self.degrees = self.ct['degrees']
         self.translate = self.ct['translate']
         self.mosaic_scale = self.ct['mosaic_scale']
-        self.mixup_scale = self.ct['mixup_scale']
+        self.copypaste_scale = self.ct['copypaste_scale']
         self.shear = self.ct['shear']
         self.perspective = self.ct['perspective']
-        self.enable_mixup = self.ct['enable_mixup']
+        # mixup and cutpaste of Copypaste, cutout
+        self.enable_copypaste = self.ct['enable_copypaste']
+        self.mixup_prob = self.ct['mixup_prob']
+        self.cutpaste_prob = self.ct['cutpaste_prob']
         self.cutout_prob = self.ct['cutout_prob']
         # Training
         self.warmup = self.co['warmup']
@@ -116,13 +116,9 @@ class LitYOLOX(LightningModule):
         self.log("loss/cls", loss_cls, prog_bar=False)
         self.log("loss/l1", loss_l1, prog_bar=False)
         self.log("loss/proportion", proportion, prog_bar=False)
-        return loss
-
-    def on_train_batch_end(self, outputs, batch, batch_idx, unused=0):
-        self.lr_scheduler.step()
-        self.log("lr", self.lr_scheduler.optimizer.param_groups[0]['lr'], prog_bar=True)
         if self.ema:
             self.ema_model.update(self.model)
+        return loss
 
     def training_epoch_end(self, outputs):
         if self.current_epoch < self.mosaic_epoch:
@@ -178,12 +174,13 @@ class LitYOLOX(LightningModule):
             degrees=self.degrees,
             translate=self.translate,
             mosaic_scale=self.mosaic_scale,
-            mixup_scale=self.mixup_scale,
             shear=self.shear,
             perspective=self.perspective,
-            enable_mixup=self.enable_mixup,
+            enable_copypaste=self.enable_copypaste,
             mosaic_prob=self.mosaic_prob,
             mixup_prob=self.mixup_prob,
+            cutpaste_prob=self.cutpaste_prob,
+            copypaste_scale=self.copypaste_scale,
             cutout_prob=self.cutout_prob,
         )
         sampler = RandomSampler(self.dataset_train)
@@ -206,32 +203,17 @@ class LitYOLOX(LightningModule):
         return val_loader
 
     def configure_optimizers(self):
-        # pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
-        # for k, v in self.model.named_modules():
-        #     if hasattr(v, "bias") and isinstance(v.bias, nn.Parameter):
-        #         pg2.append(v.bias)  # biases
-        #     if isinstance(v, nn.BatchNorm2d) or "bn" in k:
-        #         pg0.append(v.weight)  # no decay
-        #     elif hasattr(v, "weight") and isinstance(v.weight, nn.Parameter):
-        #         pg1.append(v.weight)  # apply decay
-        # optimizer = torch.optim.SGD(
-        #     pg0, lr=self.co["learning_rate"], momentum=self.co["momentum"], nesterov=True
-        # )
-        # optimizer.add_param_group(
-        #     {"params": pg1, "weight_decay": self.co["weight_decay"]}
-        # )  # add pg1 with weight_decay
-        # optimizer.add_param_group({"params": pg2})
-
-        optimizer = SGD(self.parameters(), lr=self.co["learning_rate"], momentum=self.co["momentum"])
+        # optimizer = SGD(self.parameters(), lr=self.co["learning_rate"], momentum=self.co["momentum"])
+        optimizer = AdamW(self.parameters(), lr=self.co["learning_rate"])
         steps_per_epoch = 1440 // self.train_batch_size
-        self.lr_scheduler = CosineWarmupScheduler(
-            optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch * 1.5
+        lr_scheduler = CosineWarmupScheduler(
+            optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch * 1.2
         )
-        return optimizer
+        return [optimizer], [lr_scheduler]
 
     def on_train_end(self) -> None:
         average_ifer_time = torch.tensor(self.iter_times, dtype=torch.float32).mean()
-        self.log("inference_time", average_ifer_time, prog_bar=False)
+        print("The average iference time is ", average_ifer_time, " ms")
 
 
 def initializer(M):
