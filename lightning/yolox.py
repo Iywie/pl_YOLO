@@ -1,3 +1,4 @@
+import time
 import torch
 import torch.nn as nn
 from pytorch_lightning import LightningModule
@@ -81,11 +82,12 @@ class LitYOLOX(LightningModule):
         self.cutout_prob = self.ct['cutout_prob']
         # Training
         self.warmup = self.co['warmup']
+        self.iter_times = []
 
         self.backbone = CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         self.neck = PAFPN(n_depth, n_channels, n_norm, n_act)
-        # self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
-        self.head = YOLOFDecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
+        self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
+        # self.head = YOLOFDecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         self.loss = YOLOXLoss(self.num_classes, strides)
         self.decoder = YOLOXDecoder(self.num_classes, strides)
 
@@ -128,7 +130,7 @@ class LitYOLOX(LightningModule):
         else:
             self.dataset_train.enable_mosaic = False
             self.loss.use_l1 = True
-        if self.trainer.max_epochs - self.current_epoch < 15:
+        if self.trainer.max_epochs - self.current_epoch < 20:
             self.trainer.check_val_every_n_epoch = 1
 
     def validation_step(self, batch, batch_idx):
@@ -137,8 +139,10 @@ class LitYOLOX(LightningModule):
             model = self.ema_model.ema
         else:
             model = self.model
+        start_time = time.time()
         output = model(imgs)
         detections = self.decoder(output, self.confidence_threshold, self.nms_threshold)
+        self.iter_times.append(time.time() - start_time)
         detections = convert_to_coco_format(detections, image_id, img_hw, self.img_size_val, self.dataset_val.class_ids)
         return detections
 
@@ -194,7 +198,7 @@ class LitYOLOX(LightningModule):
             name=self.val_dir,
             img_size=self.img_size_val,
             preprocess=ValTransform(legacy=False),
-            cache=False,
+            cache=True,
         )
         sampler = torch.utils.data.SequentialSampler(self.dataset_val)
         val_loader = DataLoader(self.dataset_val, batch_size=self.val_batch_size, sampler=sampler,
@@ -224,6 +228,10 @@ class LitYOLOX(LightningModule):
             optimizer, warmup=self.warmup * steps_per_epoch, max_iters=self.trainer.max_epochs * steps_per_epoch * 1.5
         )
         return optimizer
+
+    def on_train_end(self) -> None:
+        average_ifer_time = torch.tensor(self.iter_times, dtype=torch.float32).mean()
+        self.log("inference_time", average_ifer_time, prog_bar=False)
 
 
 def initializer(M):

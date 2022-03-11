@@ -15,9 +15,8 @@ def COCOEvaluator(data_dict, val_dataset):
     # pycocotools box format: (x1, y1, w, h)
     annType = ["segm", "bbox", "keypoints"]
     if len(data_dict) > 0:
-        _, tmp = tempfile.mkstemp()
-        json.dump(data_dict, open(tmp, "w"))
-        cocoDt = cocoGt.loadRes(tmp)
+        json.dump(data_dict, open("./COCO_val.json", "w"))
+        cocoDt = cocoGt.loadRes("./COCO_val.json")
 
         cocoEval = COCOeval(cocoGt, cocoDt, annType[1])
         cocoEval.evaluate()
@@ -28,7 +27,7 @@ def COCOEvaluator(data_dict, val_dataset):
         info = redirect_string.getvalue()
         return cocoEval.stats[0], cocoEval.stats[1], info
     else:
-        return 0.0, 0.0, None
+        return 0.0, 0.0, "No detection!"
 
 
 def convert_to_coco_format(outputs, ids, hws, val_size, class_ids):
