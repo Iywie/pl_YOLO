@@ -22,7 +22,7 @@ def main():
     trainer = Trainer(
         # precision=16,
         # tpu_cores=8,
-        # gpus=1,
+        gpus=1,
         max_epochs=300,
         check_val_every_n_epoch=5,
         log_every_n_steps=10,
@@ -35,8 +35,8 @@ def main():
         # callbacks=[device_stats],
         # default_root_dir="lightning_logs",
         # detect_anomaly=True,
-        limit_train_batches=3,
-        limit_val_batches=0,
+        # limit_train_batches=3,
+        # limit_val_batches=0,
         # reload_dataloaders_every_n_epochs=10,
     )
 

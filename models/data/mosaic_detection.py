@@ -196,9 +196,7 @@ class MosaicDetection(Dataset):
             y_offset = random.randint(0, padded_img.shape[0] - target_h - 1)
         if padded_img.shape[1] > target_w:
             x_offset = random.randint(0, padded_img.shape[1] - target_w - 1)
-        padded_cropped_img = padded_img[
-                             y_offset: y_offset + target_h, x_offset: x_offset + target_w
-                             ]
+        padded_cropped_img = padded_img[y_offset: y_offset + target_h, x_offset: x_offset + target_w]
 
         cp_bboxes_origin_np = adjust_box_anns(
             cp_labels[:, :4].copy(), cp_scale_ratio, 0, 0, origin_w, origin_h
@@ -221,15 +219,18 @@ class MosaicDetection(Dataset):
             box_labels = cp_bboxes_transformed_np[keep_list]
             labels = np.hstack((box_labels, cls_labels))
             if opera == "cutpaste":
-                for box in box_labels:
-                    origin_img[int(box[0]): int(box[2]), int(box[1]):int(box[3])] = \
-                        padded_cropped_img[int(box[0]): int(box[2]), int(box[1]):int(box[3])]
+                for i in range(len(labels)):
+                    box = labels[i][:4]
                     ioa = bbox_ioa(box, origin_labels)
-                    origin_labels = origin_labels[ioa < 0.5]
+                    if ioa < 0.3:
+                        origin_img[int(box[0]): int(box[2]), int(box[1]):int(box[3])] = \
+                            0.8 * padded_cropped_img[int(box[0]): int(box[2]), int(box[1]):int(box[3])] + \
+                            0.2 * origin_img[int(box[0]): int(box[2]), int(box[1]):int(box[3])]
+                        origin_labels = np.vstack((origin_labels, labels[i]))
             elif opera == "mixup":
                 origin_img = origin_img.astype(np.float32)
                 origin_img = 0.5 * origin_img + 0.5 * padded_cropped_img.astype(np.float32)
-            origin_labels = np.vstack((origin_labels, labels))
+                origin_labels = np.vstack((origin_labels, labels))
         return origin_img.astype(np.uint8), origin_labels
 
 

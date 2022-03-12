@@ -4,7 +4,6 @@ from models.utils.bbox import bbox_ioa
 
 
 def cutout(image, labels, background=None):
-
     # Applies image cutout augmentation https://arxiv.org/abs/1708.04552
     h, w = image.shape[:2]
     # create random masks
@@ -22,15 +21,17 @@ def cutout(image, labels, background=None):
         if background is not None:
             block_i = random.randint(0, len(background) - 1)
             block_h, block_w, _ = background[block_i].shape
-            block_h = min(block_h, ymax-ymin)
-            block_w = min(block_w, xmax-xmin)
+            block_h = min(block_h, ymax - ymin)
+            block_w = min(block_w, xmax - xmin)
 
             if len(labels) and s > 0.03:
                 box = np.array([xmin, ymin, xmin + block_w, ymin + block_h], dtype=np.float32)
                 ioa = bbox_ioa(box, labels[:, :4])  # intersection over area
                 if ioa.max() > 0.3:
                     continue
-            image[ymin:ymin + block_h, xmin:xmin + block_w] = background[block_i][:block_h, :block_w]
+            image[ymin:ymin + block_h, xmin:xmin + block_w] = \
+                background[block_i][:block_h, :block_w] * 0.8 + image[ymin:ymin + block_h, xmin:xmin + block_w] * 0.2
+
         else:
             image[ymin:ymax, xmin:xmax] = [random.randint(64, 191) for _ in range(3)]
             # return unobscured labels
@@ -40,6 +41,3 @@ def cutout(image, labels, background=None):
                 labels = labels[ioa < 0.6]  # remove >60% obscured labels
 
     return image, labels
-
-
-
