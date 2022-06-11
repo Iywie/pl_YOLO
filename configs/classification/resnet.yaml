@@ -1,6 +1,0 @@
-# Parameters
-
-dataset:
-    dir: '/root/autodl-tmp/CIFAR10'
-    train_batch_size: 1024
-

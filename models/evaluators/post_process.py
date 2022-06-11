@@ -87,9 +87,9 @@ def coco_post(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnos
     #         # Perform non-maximum suppression
     #         max_detections = []
     #         while detections_class.size(0):
-    #             # Get lightning with the highest confidence and save as max lightning
+    #             # Get PL_Modules with the highest confidence and save as max PL_Modules
     #             max_detections.append(detections_class[0].unsqueeze(0))
-    #             # Stop if we're at the last lightning
+    #             # Stop if we're at the last PL_Modules
     #             if len(detections_class) == 1:
     #                 break
     #             # Get the IOUs for all boxes with lower confidence

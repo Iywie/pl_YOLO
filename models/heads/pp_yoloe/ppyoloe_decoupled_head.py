@@ -1,10 +1,11 @@
 import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from models.layers.network_blocks import BaseConv
 
 
-class YOLOFDecoupledHead(nn.Module):
+class PPYOLOEDecoupledHead(nn.Module):
     def __init__(
             self,
             num_classes=80,
@@ -18,54 +19,46 @@ class YOLOFDecoupledHead(nn.Module):
         self.num_classes = num_classes
         ch = self.n_anchors * self.num_classes
         conv = BaseConv
-        self.stems = nn.ModuleList()
+        # ESE block
+        self.stem_cls = nn.ModuleList()
+        self.stem_reg = nn.ModuleList()
         self.cls_convs = nn.ModuleList()
         self.cls_preds = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         self.reg_preds = nn.ModuleList()
         self.obj_preds = nn.ModuleList()
-        self.implicitA = nn.ModuleList()
-        self.implicitM = nn.ModuleList()
 
         # For each feature map we go through different convolution.
         for i in range(len(in_channels)):
-            self.implicitA.append(
-                ImplicitA(in_channels[i])
-            )
-            self.stems.append(
-                BaseConv(in_channels[i], in_channels[0], ksize=1, stride=1, act=act)
-            )
-            self.implicitM.append(
-                ImplicitM(in_channels[0])
-            )
+            self.stem_cls.append(ESEAttn(in_channels[i], norm=norm, act=act))
+            self.stem_reg.append(ESEAttn(in_channels[i], norm=norm, act=act))
+
             self.cls_convs.append(
                 nn.Sequential(
                     *[
-                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
-                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[i], in_channels[i], ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[i], in_channels[i], ksize=3, stride=1, norm=norm, act=act),
                     ]
                 )
             )
-
             self.cls_preds.append(
-                nn.Conv2d(in_channels[0], ch, kernel_size=(1, 1), stride=(1, 1), padding=0)
+                nn.Conv2d(in_channels[i], ch, kernel_size=(1, 1), stride=(1, 1), padding=0)
             )
 
             self.reg_convs.append(
                 nn.Sequential(
                     *[
-                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
-                        conv(in_channels[0], in_channels[0], ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[i], in_channels[i], ksize=3, stride=1, norm=norm, act=act),
+                        conv(in_channels[i], in_channels[i], ksize=3, stride=1, norm=norm, act=act),
                     ]
                 )
             )
-
             self.reg_preds.append(
-                nn.Conv2d(in_channels[0], self.n_anchors * 4, kernel_size=(1, 1), stride=(1, 1), padding=0)
+                nn.Conv2d(in_channels[i], self.n_anchors * 4, kernel_size=(1, 1), stride=(1, 1), padding=0)
             )
 
             self.obj_preds.append(
-                nn.Conv2d(in_channels[0], self.n_anchors * 1, kernel_size=(1, 1), stride=(1, 1), padding=0)
+                nn.Conv2d(in_channels[i], self.n_anchors * 1, kernel_size=(1, 1), stride=(1, 1), padding=0)
             )
 
     def initialize_biases(self, prior_prob):
@@ -82,13 +75,11 @@ class YOLOFDecoupledHead(nn.Module):
     def forward(self, inputs):
         outputs = []
         for k, (cls_conv, reg_conv, x) in enumerate(zip(self.cls_convs, self.reg_convs, inputs)):
-            x = x + self.implicitA[k]().expand_as(x)
-            # Change all inputs to the same channel.
-            x = self.stems[k](x)
-            x = x * self.implicitM[k]().expand_as(x)
 
-            cls_x = x
-            reg_x = x
+            # ECE Block
+            avg_x = F.adaptive_avg_pool2d(x, (1, 1))
+            cls_x = self.stem_cls[k](x, avg_x) + x
+            reg_x = self.stem_reg[k](x, avg_x)
 
             cls_feat = cls_conv(cls_x)
             cls_output = self.cls_preds[k](cls_feat)
@@ -122,3 +113,14 @@ class ImplicitM(nn.Module):
 
     def forward(self):
         return self.implicit
+
+
+class ESEAttn(nn.Module):
+    def __init__(self, feat_channels, norm='bn', act='swish'):
+        super(ESEAttn, self).__init__()
+        self.fc = nn.Conv2d(feat_channels, feat_channels, 1)
+        self.conv = BaseConv(feat_channels, feat_channels, 1, stride=1, norm=norm, act=act)
+
+    def forward(self, feat, avg_feat):
+        weight = torch.sigmoid(self.fc(avg_feat))
+        return self.conv(feat * weight)

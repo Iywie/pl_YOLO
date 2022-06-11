@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models.losses import bboxes_iou, ciou_loss, IOUloss
+from models.losses.iou_loss import bboxes_iou, IOUloss
 from models.layers.network_blocks import BaseConv
 
 

@@ -40,7 +40,9 @@ class COCODataset(Dataset):
             self._cache_images()
         else:
             self.imgs = self._load_imgs()
-        self.back_imgs, self.back_blocks = getBackground(self.imgs, self.annotations, self.img_size)
+        # Background imgs and blocks
+        self.back_blocks, self.back_cls, self.object_cls = getBackground(
+            self.imgs, self.annotations, self.class_ids)
 
     def __len__(self):
         return len(self.ids)

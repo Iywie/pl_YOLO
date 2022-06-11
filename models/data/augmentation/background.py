@@ -1,43 +1,46 @@
 import numpy as np
 
 
-def getBackground(images, labels, img_size):
-    """
-        Separate the background_image to 16 blocks
-    """
-    background_images = []
-    background_blocks = []
-    input_h, input_w = img_size[0], img_size[1]
-    block_h, block_w = input_h // 4, input_w // 4
-    i_block = 0
-    current_h = 0
-    current_w = 0
-    back_img = np.full((input_h, input_w, 3), 114, dtype=np.uint8)
+def getBackground(images, labels, class_list):
+
+    bg = []  # background blocks
+    obj = []
+    bg_c = []  # background blocks with class
+    obj_c = []  # objects with class
+    for i in range(len(class_list)):
+        bg_c.append([])
+        obj_c.append([])
 
     for image, label in zip(images, labels):
-
-        xmin = label[0][:, 0].min()
-        ymin = label[0][:, 1].min()
-        xmax = label[0][:, 2].max()
-        ymax = label[0][:, 3].max()
+        if len(label[0]) == 0:
+            continue
+        xmin = int(label[0][:, 0].min())
+        ymin = int(label[0][:, 1].min())
+        xmax = int(label[0][:, 2].max())
+        ymax = int(label[0][:, 3].max())
         (h, w, c) = image.shape[:3]
-        if i_block == 0:
-            back_img = np.full((input_h, input_w, c), 114, dtype=np.uint8)
-            current_w = i_block * block_w
-            current_h = i_block * block_h
-        if xmin > block_w and ymin > block_h:
-            back_img[current_h: (current_h+block_h), current_w: (current_w+block_w)] = image[:block_h, :block_w]
-            background_blocks.append(image[:block_h, :block_w])
-            i_block += 1
-            current_w = (i_block % 4) * block_w
-            current_h = (i_block // 4) * block_h
-        elif (w - xmax) > block_w and (h - ymax) > block_h:
-            back_img[current_h: (current_h + block_h), current_w: (current_w + block_w)] = image[-block_h:, -block_w:]
-            background_blocks.append(image[:block_h, :block_w])
-            i_block += 1
-            current_w = (i_block % 4) * block_w
-            current_h = (i_block // 4) * block_h
-        if i_block == 15:
-            background_images.append(back_img)
-            i_block = 0
-    return background_images, background_blocks
+
+        for res in label[0]:
+            cls = int(res[4])
+            obj.append(image[int(res[1]):int(res[3]), int(res[0]):int(res[2])])
+            obj_c[cls].append(image[int(res[1]):int(res[3]), int(res[0]):int(res[2])])
+
+        # extract edge non-defect area to background-class list
+        clss = label[0][:, 4]
+        clss = np.unique(clss)
+        for cls in clss:
+            cls = int(cls)
+            if xmin > 10 and ymin > 10:
+                bg_c[cls].append(image[:ymin, :xmin])
+                bg.append(image[:ymin, :xmin])
+            if w - xmax > 10 and h - ymax > 10:
+                bg_c[cls].append(image[ymax:h, xmax:w])
+                bg.append(image[ymax:h, xmax:w])
+            if xmin > 10 and h - ymax > 10:
+                bg_c[cls].append(image[ymax:h, :xmin])
+                bg.append(image[ymax:h, :xmin])
+            if w - xmax > 10 and ymin > 10:
+                bg_c[cls].append(image[:ymin, xmax:w])
+                bg.append(image[:ymin, xmax:w])
+
+    return bg, bg_c, obj_c

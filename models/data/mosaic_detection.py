@@ -3,17 +3,18 @@ import cv2
 import math
 import numpy as np
 from torch.utils.data.dataset import Dataset
-from models.data.augmentation.cutout import cutout
+from models.data.augmentation.cutpaste import cutpaste
+from models.data.augmentation.copypaste import copyPaste
 from models.utils.bbox import bbox_ioa
 
 
 class MosaicDetection(Dataset):
     def __init__(
-            self, dataset, img_size, mosaic=True, preprocess=None,
-            degrees=10, translate=0.1, mosaic_scale=(0.5, 1.5),
-            shear=2.0, perspective=0.0, mosaic_prob=1.0,
-            enable_copypaste=False, mixup_prob=0.0, cutpaste_prob=0.0, copypaste_scale=(0.5, 1.5),
-            cutout_prob=0.0,
+            self, dataset, img_size, preprocess=None,
+            mosaic_prob=1.0, mosaic_scale=(0.5, 1.5),
+            degrees=10, translate=0.1, shear=2.0, perspective=0.0,
+            copypaste_prob=0.0, copypaste_scale=(0.5, 1.5),
+            cutpaste_prob=0.0,
     ):
         """
         Args:
@@ -31,28 +32,25 @@ class MosaicDetection(Dataset):
             *args(tuple) : Additional arguments for mixup random sampler.
         """
         super().__init__()
-        self.img_size = img_size
         self._dataset = dataset
+        self.img_size = img_size
+        self.mosaic_prob = mosaic_prob
+        self.scale = mosaic_scale
         self.preprocess = preprocess
         self.degrees = degrees
         self.translate = translate
-        self.scale = mosaic_scale
         self.shear = shear
         self.perspective = perspective
-        self.enable_mosaic = mosaic
-        self.mosaic_prob = mosaic_prob
-        self.enable_copypaste = enable_copypaste
-        self.mixup_prob = mixup_prob
-        self.cutpaste_prob = cutpaste_prob
+        self.copypaste_prob = copypaste_prob
         self.copypaste_scale = copypaste_scale
-        self.cutout_prob = cutout_prob
+        self.cutpaste_prob = cutpaste_prob
 
     def __len__(self):
         return len(self._dataset)
 
     # @Dataset.mosaic_getitem
     def __getitem__(self, idx):
-        if self.enable_mosaic and random.random() < self.mosaic_prob:
+        if random.random() < self.mosaic_prob:
             mosaic_labels = []
             img_size = self._dataset.img_size
             input_h, input_w = img_size[0], img_size[1]
@@ -70,6 +68,13 @@ class MosaicDetection(Dataset):
                     img = self._dataset.imgs[index]
                 else:
                     img = self._dataset.load_resized_img(index)
+
+                # augmentation before mosaic
+                if not len(_labels) == 0 and random.random() < self.copypaste_prob:
+                    img, _labels = copyPaste(img, _labels, self._dataset.object_cls, self.copypaste_scale)
+                if random.random() < self.cutpaste_prob:
+                    img = cutpaste(img, _labels, background=self._dataset.back_cls)
+
                 h0, w0 = img.shape[:2]  # orig hw
                 scale = min(1. * input_h / h0, 1. * input_w / w0)
                 img = cv2.resize(
@@ -115,20 +120,6 @@ class MosaicDetection(Dataset):
                 border=[-input_h // 2, -input_w // 2],
             )  # border to remove
 
-            # -----------------------------------------------------------------
-            # CopyPaste: https://arxiv.org/abs/2012.07177
-            #     MixUp and CutPaste
-            # -----------------------------------------------------------------
-            if self.enable_copypaste and not len(mosaic_labels) == 0 and random.random() < self.cutpaste_prob:
-                mosaic_img, mosaic_labels = self.copyPaste(mosaic_img, mosaic_labels, self.img_size, opera="cutpaste")
-            elif self.enable_copypaste and not len(mosaic_labels) == 0 and random.random() < self.mixup_prob:
-                mosaic_img, mosaic_labels = self.copyPaste(mosaic_img, mosaic_labels, self.img_size, opera="mixup")
-            # -----------------------------------------------------------------
-            # Cutout
-            # -----------------------------------------------------------------
-            if random.random() < self.cutout_prob:
-                mosaic_img, mosaic_labels = cutout(mosaic_img, mosaic_labels, background=self._dataset.back_blocks)
-
             mix_img, padded_labels = self.preprocess(mosaic_img, mosaic_labels, self.img_size)
             img_info = (mix_img.shape[1], mix_img.shape[2])
             return mix_img, padded_labels, img_info, np.array([idx]), img_name
@@ -140,6 +131,16 @@ class MosaicDetection(Dataset):
                 img = self._dataset.imgs[idx]
             else:
                 img = self._dataset.load_resized_img(idx)
+
+            # -----------------------------------------------------------------
+            # CopyPaste: https://arxiv.org/abs/2012.07177
+            #     MixUp and CutPaste and Cutout
+            # -----------------------------------------------------------------
+            if random.random() < self.copypaste_prob:
+                img, res = copyPaste(img, res, self._dataset.object_cls, self.copypaste_scale)
+            if random.random() < self.cutpaste_prob:
+                img = cutpaste(img, res, background=self._dataset.back_cls)
+
             if self.preprocess is not None:
                 img, target = self.preprocess(img, res, self.img_size)
             else:
@@ -172,9 +173,7 @@ class MosaicDetection(Dataset):
             (int(img.shape[1] * cp_scale_ratio), int(img.shape[0] * cp_scale_ratio)),
             interpolation=cv2.INTER_LINEAR,
         )
-        cp_img[
-        : int(img.shape[0] * cp_scale_ratio), : int(img.shape[1] * cp_scale_ratio)
-        ] = resized_img
+        cp_img[:int(img.shape[0] * cp_scale_ratio), :int(img.shape[1] * cp_scale_ratio)] = resized_img
         cp_img = cv2.resize(
             cp_img,
             (int(cp_img.shape[1] * jit_factor), int(cp_img.shape[0] * jit_factor)),
@@ -222,10 +221,10 @@ class MosaicDetection(Dataset):
                 for i in range(len(labels)):
                     box = labels[i][:4]
                     ioa = bbox_ioa(box, origin_labels)
-                    if ioa < 0.3:
-                        origin_img[int(box[0]): int(box[2]), int(box[1]):int(box[3])] = \
-                            0.8 * padded_cropped_img[int(box[0]): int(box[2]), int(box[1]):int(box[3])] + \
-                            0.2 * origin_img[int(box[0]): int(box[2]), int(box[1]):int(box[3])]
+                    if ioa.max() < 0.3:
+                        origin_img[int(box[1]): int(box[3]), int(box[0]):int(box[2])] = \
+                            0.9 * padded_cropped_img[int(box[1]): int(box[3]), int(box[0]):int(box[2])] + \
+                            0.1 * origin_img[int(box[1]): int(box[3]), int(box[0]):int(box[2])]
                         origin_labels = np.vstack((origin_labels, labels[i]))
             elif opera == "mixup":
                 origin_img = origin_img.astype(np.float32)

@@ -9,14 +9,22 @@ from models.data.datasets.pycocotools.cocoeval import COCOeval
 
 
 def COCOEvaluator(data_dict, val_dataset):
-
     # detections: (x1, y1, x2, y2, obj_conf, class_conf, class)
     cocoGt = val_dataset.coco
     # pycocotools box format: (x1, y1, w, h)
     annType = ["segm", "bbox", "keypoints"]
+
     if len(data_dict) > 0:
         json.dump(data_dict, open("./COCO_val.json", "w"))
         cocoDt = cocoGt.loadRes("./COCO_val.json")
+
+        coco_pred = {"images": [], "categories": []}
+        for (k, v) in cocoGt.imgs.items():
+            coco_pred["images"].append(v)
+        for (k, v) in cocoGt.cats.items():
+            coco_pred["categories"].append(v)
+        coco_pred["annotations"] = data_dict
+        json.dump(coco_pred, open("./COCO_val.json", "w"))
 
         cocoEval = COCOeval(cocoGt, cocoDt, annType[1])
         cocoEval.evaluate()

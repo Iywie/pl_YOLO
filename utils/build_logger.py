@@ -1,4 +1,5 @@
 from pytorch_lightning.loggers import NeptuneLogger
+from pytorch_lightning.loggers import CSVLogger
 
 
 def build_logger(logger, model, configs):
@@ -13,5 +14,7 @@ def build_logger(logger, model, configs):
         neptune_logger.log_hyperparams(params=configs)
         neptune_logger.log_model_summary(model=model, max_depth=-1)
         return neptune_logger
+    if logger == 'csv':
+        return CSVLogger("logs", name="csvlogger")
     else:
         return True

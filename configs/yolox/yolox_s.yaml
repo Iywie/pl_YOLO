@@ -1,16 +1,19 @@
 # Parameters
-model: "yolox"
+model: 'yolox'
+datamodule: 'neu-det'
 
 dataset:
     format: "COCO"
-    dir: '/root/autodl-tmp/COCO'
+    # 'D:\Code\Datasets\Detection\Steel_NEU\COCO' '/root/autodl-tmp/COCO'
+    dir: 'D:\Code\Datasets\Detection\Aluminium\COCO'
+    num_classes: 10
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
-    train_size: [416,416]  # [224,224] [416,416] [640,640]
-    val_size: [416,416]
-    train_batch_size: 32
-    val_batch_size: 32
+    train_size: [224,224]  # [224,224] [416,416] [640,640]
+    val_size: [224,224]
+    train_batch_size: 2
+    val_batch_size: 2
 
 backbone:
     name: "cspdarknet"
@@ -27,7 +30,6 @@ neck:
     activation: "silu"
 head:
     name: "decoupled_head"
-    classes: 6
 
 optimizer:
     name: "SGD"
@@ -35,26 +37,25 @@ optimizer:
     momentum: 0.9
     weight_decay: 0.0005
     lr_scheduler: "CosineWarmupScheduler"
-    warmup: 5
-    ema: true
+    warmup: 0.05
+    ema: True
 
 transform:
     # Train transform
-    hsv_prob: 0
+    hsv_prob: 0.5
     flip_prob: 0.5
     # Mosaic transform
-    mosaic_epoch: 300
     mosaic_prob: 0.9
+    mosaic_scale: [0.1, 2.0]
     # Affine transform after mosaic
     degrees: 10
     translate: 0.1
-    mosaic_scale: [0.1, 2.0]
     shear: 2.0
     perspective: 0.0
     # CopyPaste in mosaic
-    enable_copypaste: false
+    copypaste_prob: 1.0
     copypaste_scale: [0.5, 1.5]
-    mixup_prob: 0
-    cutpaste_prob: 0
-    # CutOut in mosaic
-    cutout_prob: 0.5
+    # CutPaste in mosaic
+    cutpaste_prob: 1.0
+
+

@@ -4,7 +4,7 @@ import argparse
 
 
 def argument_parser():
-    parser = argparse.ArgumentParser("Joseph's lightning")
+    parser = argparse.ArgumentParser("Joseph's PL_Modules")
     parser.add_argument("-n", "--experiment-name", type=str)
     parser.add_argument("-c", "--cfg", type=str, default='', help='model.yaml path')
     parser.add_argument("-l", "--logger", type=str, default='', help='model.yaml path')

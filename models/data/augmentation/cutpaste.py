@@ -1,42 +1,37 @@
 import random
-import math
-from torchvision import transforms
-import torch
+import numpy as np
+from models.utils.bbox import bbox_ioa
 
 
-class CutPaste(object):
-    """Base class for both cutpaste variants with common operations"""
+def cutpaste(img, labels, background=None):
+    # Applies img cutout augmentation https://arxiv.org/abs/1708.04552
+    h, w = img.shape[:2]
 
-    def __init__(self, colorJitter=0.1, transform=None):
-        self.transform = transform
+    if len(labels):
+        clss = labels[:, 4]
+        clss = np.unique(clss)
+        clss = clss.astype(int)
+    else:
+        return img.astype(np.uint8)
 
-        if colorJitter is None:
-            self.colorJitter = None
+    for i in range(random.randint(0, 10)):
+        if len(clss) > 0:
+            cls = np.random.choice(clss)
+            j = random.randint(0, len(background[cls])-1)
+            bg = background[cls][j]
+            h_bg, w_bg = bg.shape[:2]
+
+            offset_x = random.randint(0, w - w_bg)
+            offset_y = random.randint(0, h - h_bg)
+            xmin = offset_x
+            ymin = offset_y
+            xmax = offset_x + w_bg
+            ymax = offset_y + h_bg
+
+            box = np.array([xmin, ymin, xmax, ymax], dtype=np.float32)
+            ioa = bbox_ioa(box, labels[:, :4])  # intersection over area
+            if ioa.max() < 0.2:
+                img[ymin:ymax, xmin:xmax] = 0.5 * img[ymin:ymax, xmin:xmax] + 0.5 * bg
         else:
-            self.colorJitter = transforms.ColorJitter(brightness=colorJitter,
-                                                      contrast=colorJitter,
-                                                      saturation=colorJitter,
-                                                      hue=colorJitter)
-
-    def __call__(self, org_img, img):
-        # apply transforms to both images
-        if self.transform:
-            img = self.transform(img)
-            org_img = self.transform(org_img)
-        return org_img, img
-
-
-class CutPasteNormal(CutPaste):
-    """Randomly copy one patche from the image and paste it somewere else.
-    Args:
-        area_ratio (list): list with 2 floats for maximum and minimum area to cut out
-        aspect_ratio (float): minimum area ration. Ration is sampled between aspect_ratio and 1/aspect_ratio.
-    """
-    def __init__(self, area_ratio=[0.02, 0.15], aspect_ratio=0.3, **kwags):
-        super(CutPasteNormal, self).__init__(**kwags)
-        self.area_ratio = area_ratio
-        self.aspect_ratio = aspect_ratio
-
-    def __call__(self, img):
-        h = img.size[0]
-        w = img.size[1]
+            return img.astype(np.uint8)
+    return img.astype(np.uint8)

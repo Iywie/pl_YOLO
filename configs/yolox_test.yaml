@@ -1,0 +1,58 @@
+# Parameters
+datamodule: 'neu-det'
+model: 'yolox'
+
+dataset:
+    format: "COCO"
+    dir: '/root/autodl-tmp/COCO'
+    num_classes: 6
+    train: 'train'  # directory name of training image
+    val: 'val'
+    test: 'test'
+    train_size: [416,416]  # [224,224] [416,416] [640,640]
+    val_size: [416,416]
+    train_batch_size: 32
+    val_batch_size: 32
+
+backbone:
+    name: "cspdarknet"
+    depth: 0.5
+    input_channels: [32, 64, 128, 256, 512] # five blocks
+    output_features: ["dark3", "dark4", "dark5"]
+    normalization: "bn"
+    activation: "silu"
+neck:
+    name: "pafpn"
+    depth: 0.5
+    input_channels: [128, 256, 512]
+    normalization: "bn"
+    activation: "silu"
+head:
+    name: "decoupled_head"
+
+optimizer:
+    name: "SGD"
+    learning_rate: 0.03
+    momentum: 0.9
+    weight_decay: 0.0005
+    lr_scheduler: "CosineWarmupScheduler"
+    warmup: 0.1
+    ema: True
+
+transform:
+    # Train transform
+    hsv_prob: 0.5
+    flip_prob: 0.5
+    # Mosaic transform
+    mosaic_prob: 0.9
+    mosaic_scale: [0.1, 2.0]
+    # Affine transform after mosaic
+    degrees: 10
+    translate: 0.1
+    shear: 2.0
+    perspective: 0.0
+    # CopyPaste in mosaic
+    copypaste_prob: 0
+    copypaste_scale: [0.5, 1.5]
+    # CutPaste in mosaic
+    cutpaste_prob: 0
