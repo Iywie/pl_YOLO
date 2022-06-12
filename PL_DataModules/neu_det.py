@@ -44,7 +44,7 @@ class NEUDataModule(pl.LightningDataModule):
             name=self.train_dir,
             img_size=self.img_size_train,
             preprocess=TrainTransform(max_labels=50, flip_prob=self.flip_prob, hsv_prob=self.hsv_prob),
-            cache=False
+            cache=True
         )
         self.dataset_train = MosaicDetection(
             self.dataset_train,
@@ -75,7 +75,7 @@ class NEUDataModule(pl.LightningDataModule):
             name=self.val_dir,
             img_size=self.img_size_val,
             preprocess=ValTransform(legacy=False),
-            cache=False,
+            cache=True,
         )
         sampler = torch.utils.data.SequentialSampler(self.dataset_val)
         val_loader = DataLoader(self.dataset_val, batch_size=self.val_batch_size, sampler=sampler,

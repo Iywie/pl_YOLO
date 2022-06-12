@@ -4,15 +4,15 @@ model: 'yolox'
 
 dataset:
     format: "COCO"
-    dir: '/root/autodl-tmp/COCO'
+    dir: 'F:\Code\Datasets\Steel_NEU\COCO'
     num_classes: 6
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
-    train_size: [416,416]  # [224,224] [416,416] [640,640]
-    val_size: [416,416]
-    train_batch_size: 32
-    val_batch_size: 32
+    train_size: [224,224]  # [224,224] [416,416] [640,640]
+    val_size: [224,224]
+    train_batch_size: 16
+    val_batch_size: 16
 
 backbone:
     name: "cspdarknet"

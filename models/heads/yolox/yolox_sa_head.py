@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.layers.network_blocks import BaseConv
-from models.layers.deformable_conv2dmy import DeformConv2d
+from torchvision.ops import deform_conv2d
 
 
 class YOLOXSADecoupledHead(nn.Module):
@@ -34,7 +34,6 @@ class YOLOXSADecoupledHead(nn.Module):
         self.cls_prob_conv2 = nn.ModuleList()
         self.reg_offset_conv1 = nn.ModuleList()
         self.reg_offset_conv2 = nn.ModuleList()
-        self.deform = DeformConv2d(self.n_anchors * 4, self.n_anchors * 4, kernel_size=1, padding=0, stride=1)
 
         # For each feature map we go through different convolution.
         for i in range(len(in_channels)):
@@ -121,12 +120,15 @@ class YOLOXSADecoupledHead(nn.Module):
 
             cls_feat = cls_conv(cls_x)
             cls_output = self.cls_preds[k](cls_feat)
-            cls_output = (cls_output.sigmoid * M.sigmoid()).sqrt()
-            cls_output = math.log(cls_output / (1 - cls_output + 1e-16) + 1e-16)
+            cls_output = (cls_output.sigmoid() * M.sigmoid()).sqrt()
+            cls_output = torch.log(cls_output / (1 - cls_output + 1e-16) + 1e-16)
 
             reg_feat = reg_conv(reg_x)
             obj_output = self.obj_preds[k](reg_feat)
             reg_output = self.reg_preds[k](reg_feat)
+            b, c, h, w = reg_output.shape
+            weight = reg_output.new_ones(c, 1, 1, 1)
+            reg_output = deform_conv2d(reg_output, O, weight, mask=None)
             # reg_output = self.deform(reg_output, O)
 
             # output: [batch_size, n_ch, h, w]

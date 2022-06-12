@@ -1,6 +1,6 @@
 import torch
-from thop import profile
-from thop import clever_format
+# from thop import profile
+# from thop import clever_format
 from nni.compression.pytorch.utils.counter import count_flops_params
 
 
