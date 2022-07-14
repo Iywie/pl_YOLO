@@ -37,6 +37,8 @@ class NEUDataModule(pl.LightningDataModule):
         self.copypaste_scale = self.ct['copypaste_scale']
         # cutpaste
         self.cutpaste_prob = self.ct['cutpaste_prob']
+        # cutout rounding background
+        self.cutoutR_prob = self.ct['cutoutR_prob']
 
     def train_dataloader(self):
         self.dataset_train = COCODataset(
@@ -62,11 +64,12 @@ class NEUDataModule(pl.LightningDataModule):
             copypaste_prob=self.copypaste_prob,
             copypaste_scale=self.copypaste_scale,
             cutpaste_prob=self.cutpaste_prob,
+            cutoutR_prob=self.cutoutR_prob
         )
         sampler = RandomSampler(self.dataset_train)
         batch_sampler = BatchSampler(sampler, batch_size=self.train_batch_size, drop_last=False)
         train_loader = DataLoader(self.dataset_train, batch_sampler=batch_sampler,
-                                  num_workers=12, pin_memory=True)
+                                  num_workers=6, pin_memory=True,  persistent_workers=True)
         return train_loader
 
     def val_dataloader(self):
@@ -79,5 +82,5 @@ class NEUDataModule(pl.LightningDataModule):
         )
         sampler = torch.utils.data.SequentialSampler(self.dataset_val)
         val_loader = DataLoader(self.dataset_val, batch_size=self.val_batch_size, sampler=sampler,
-                                num_workers=6, pin_memory=True, shuffle=False)
+                                num_workers=6, pin_memory=True, shuffle=False,  persistent_workers=True)
         return val_loader

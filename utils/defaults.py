@@ -9,6 +9,7 @@ def argument_parser():
     parser.add_argument("-c", "--cfg", type=str, default='', help='model.yaml path')
     parser.add_argument("-l", "--logger", type=str, default='', help='model.yaml path')
     parser.add_argument("-d", "--data", type=str, default=None, help='dataset path reset')
+    parser.add_argument("-v", "--version", type=str, default=None, help='experiment version')
     # parser.add_argument("-c", "--checkpoint", default=None, type=str, help="checkpoint file")
     parser.add_argument("--resume", default=False, action="store_true", help="resume training")
     return parser

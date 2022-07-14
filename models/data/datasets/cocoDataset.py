@@ -4,6 +4,7 @@ import numpy as np
 from models.data.datasets.pycocotools.coco import COCO
 from torch.utils.data.dataset import Dataset
 from models.data.augmentation.background import getBackground
+from models.utils.bbox import x1y1wh2xyxy
 
 
 class COCODataset(Dataset):
@@ -35,11 +36,14 @@ class COCODataset(Dataset):
         self.ids = self.coco.getImgIds()
         self.class_ids = sorted(self.coco.getCatIds())
         self.annotations = self._load_coco_annotations()
+        self.gt_bboxes = self._get_gtbbox()
+
         self.imgs = None
         if cache:
             self._cache_images()
         else:
             self.imgs = self._load_imgs()
+
         # Background imgs and blocks
         self.back_blocks, self.back_cls, self.object_cls = getBackground(
             self.imgs, self.annotations, self.class_ids)
@@ -160,3 +164,30 @@ class COCODataset(Dataset):
             gb += self.imgs[k].nbytes
             pbar.desc = f'Caching images ({gb / 1E9:.1f}GB)'
         pbar.close()
+
+    # def _get_gtbbox(self):
+    #     gt_bbox = []
+    #     for i in range(len(self)):
+    #         box = self.annotations[i][0][:, :4]
+    #         cls = self.annotations[i][0][:, [4]]
+    #         img_id = self.ids[i]
+    #         for j in range(box.shape[0]):
+    #             bbox = {'box': box[j], 'cls': self.class_ids[int(cls[j])], 'img_id': img_id}
+    #             gt_bbox.append(bbox)
+    #     return gt_bbox
+
+    def _get_gtbbox(self):
+        return [self.get_gtbbox(_id) for _id in self.ids]
+
+    def get_gtbbox(self, id_):
+        anno_ids = self.coco.getAnnIds(imgIds=[id_], iscrowd=False)
+        annotation = self.coco.loadAnns(anno_ids)
+        bboxes = []
+        for obj in annotation:
+            bbox = obj['bbox'].copy()
+            bbox = x1y1wh2xyxy(np.array(bbox))
+            cls = self.class_ids.index(obj["category_id"])
+            bbox = np.append(bbox, cls)
+            bboxes.append(bbox)
+
+        return {'bboxes': np.array(bboxes), 'image_id': id_}

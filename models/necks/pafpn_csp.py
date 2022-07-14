@@ -4,13 +4,13 @@ import torch.nn as nn
 from models.layers.network_blocks import BaseConv, CSPLayer
 
 
-class PAFPN(nn.Module):
+class CSPPAFPN(nn.Module):
     """
-    Only proceed 3 layer input. Like dark3, dark4, dark5.
+    Only proceed 3 layer input. Like stage2, stage3, stage4.
     """
     def __init__(
         self,
-        depth=1.0,
+        depths=(1, 1, 1, 1),
         in_channels=(256, 512, 1024),
         norm='bn',
         act="silu",
@@ -23,7 +23,7 @@ class PAFPN(nn.Module):
         self.p5_p4 = CSPLayer(
             2 * in_channels[1],
             in_channels[1],
-            round(3 * depth),
+            num_bottle=depths[0],
             shortcut=False,
             norm=norm,
             act=act,
@@ -31,7 +31,7 @@ class PAFPN(nn.Module):
         self.p4_p3 = CSPLayer(
             2 * in_channels[0],
             in_channels[0],
-            round(3 * depth),
+            num_bottle=depths[0],
             shortcut=False,
             norm=norm,
             act=act,
@@ -43,7 +43,7 @@ class PAFPN(nn.Module):
         self.n3_n4 = CSPLayer(
             2 * in_channels[0],
             in_channels[1],
-            round(3 * depth),
+            num_bottle=depths[0],
             shortcut=False,
             norm=norm,
             act=act,
@@ -51,7 +51,7 @@ class PAFPN(nn.Module):
         self.n4_n5 = CSPLayer(
             2 * in_channels[1],
             in_channels[2],
-            round(3 * depth),
+            num_bottle=depths[0],
             shortcut=False,
             norm=norm,
             act=act,

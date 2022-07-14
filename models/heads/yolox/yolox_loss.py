@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.losses.iou_loss import bboxes_iou, IOUloss
-from models.losses.focal_loss import sigmoid_focal_loss
 
 
 class YOLOXLoss:
@@ -137,7 +136,6 @@ class YOLOXLoss:
         loss_obj = (self.bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)).sum() / num_fgs
 
         loss_cls = (self.bcewithlog_loss(cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets)).sum() / num_fgs
-        # loss_cls = (sigmoid_focal_loss(cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets, gamma=0))
 
         # L1loss is the distance among the four property of a predicted box.
         if self.use_l1:

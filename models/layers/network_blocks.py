@@ -1,17 +1,20 @@
 import torch
 import torch.nn as nn
-from .activation import get_activation
-from .normalization import get_normalization
+from activation import get_activation
+from normalization import get_normalization
 
 
 class BaseConv(nn.Module):
     """A Convolution2d -> Normalization -> Activation"""
     def __init__(
-        self, in_channels, out_channels, ksize, stride, groups=1, bias=False, norm="bn", act="silu"
+        self, in_channels, out_channels, ksize, stride, padding=None, groups=1, bias=False, norm="bn", act="silu"
     ):
         super().__init__()
         # same padding
-        pad = (ksize - 1) // 2
+        if padding is None:
+            pad = (ksize - 1) // 2
+        else:
+            pad = padding
         self.conv = nn.Conv2d(
             in_channels,
             out_channels,
@@ -21,11 +24,17 @@ class BaseConv(nn.Module):
             groups=groups,
             bias=bias,
         )
-        self.bn = get_normalization(norm, out_channels)
+        self.norm = get_normalization(norm, out_channels)
         self.act = get_activation(act, inplace=True)
 
     def forward(self, x):
-        return self.act(self.bn(self.conv(x)))
+        if self.norm is None and self.act is None:
+            return self.conv(x)
+        elif self.act is None:
+            return self.norm(self.conv(x))
+        elif self.norm is None:
+            return self.act(self.conv(x))
+        return self.act(self.norm(self.conv(x)))
 
     def fuseforward(self, x):
         return self.act(self.conv(x))

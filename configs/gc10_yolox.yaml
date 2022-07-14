@@ -1,33 +1,48 @@
 # Parameters
-model: "yolox"
+datamodule: 'neu-det'
+model: 'yolox'
 
 dataset:
     format: "COCO"
-    dir: '/root/autodl-tmp/CG'
+    dir: '../GC10_COCO/'
+    num_classes: 10
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
-    train_size: [416,416]  # [224,224] [416,416] [640,640]
-    val_size: [416,416]
+    train_size: [320,320]  # [224,224] [320,320] [416,416] [640,640]
+    val_size: [320,320]
     train_batch_size: 32
     val_batch_size: 32
 
 backbone:
-    name: "cspdarknet"
-    depth: 0.5
-    input_channels: [32, 64, 128, 256, 512] # five blocks
-    output_features: ["dark3", "dark4", "dark5"]
+    # base
+    depths: [2, 2, 2, 2]
+    input_channels: [64, 128, 256, 512] # five blocks
+    output_features: ["stage2", "stage3", "stage4"]
     normalization: "bn"
     activation: "silu"
+
+    # ResNet
+    block: "BasicBlock"  # BottleNeck
+
+    # ConvNext
+    drop_path_rate: 0.0
+    layer_scale_init_value: 0.000001
+
+    # Swim
+    patch_size: [ 4, 4 ]
+    embed_dim: 96
+    num_heads: [ 3, 6, 12, 24 ]
+
 neck:
-    name: "pafpn"
-    depth: 0.5
+    # base
+    depths: [1, 1, 1, 1]
     input_channels: [128, 256, 512]
     normalization: "bn"
     activation: "silu"
+
 head:
     name: "decoupled_head"
-    classes: 10
 
 optimizer:
     name: "SGD"
@@ -35,26 +50,23 @@ optimizer:
     momentum: 0.9
     weight_decay: 0.0005
     lr_scheduler: "CosineWarmupScheduler"
-    warmup: 5
-    ema: true
+    warmup: 0.1
+    ema: True
 
 transform:
     # Train transform
-    hsv_prob: 0
+    hsv_prob: 0.5
     flip_prob: 0.5
     # Mosaic transform
-    mosaic_epoch: 300
     mosaic_prob: 0.9
-    # Affine transform after mosaic
-    degrees: 10
-    translate: 0.1
     mosaic_scale: [0.1, 2.0]
+    # Affine transform after mosaic
+    degrees: 0
+    translate: 0.1
     shear: 2.0
     perspective: 0.0
     # CopyPaste in mosaic
-    enable_copypaste: false
+    copypaste_prob: 0
     copypaste_scale: [0.5, 1.5]
-    mixup_prob: 0
+    # CutPaste in mosaic
     cutpaste_prob: 0
-    # CutOut in mosaic
-    cutout_prob: 0

@@ -3,19 +3,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models.losses.iou_loss import bboxes_iou, IOUloss
 
+EPS = 1e-12
 
-class PPYOLOEXLoss:
+
+class DWLoss:
     def __init__(self, num_classes, strides, use_l1=False):
-        super(PPYOLOEXLoss, self).__init__()
+        super(DWLoss, self).__init__()
         self.num_classes = num_classes
         self.strides = strides
         self.n_anchors = 1
         self.grids = [torch.zeros(1)] * len(strides)
         self.use_l1 = use_l1
-        self.alpha = 1.0
-        self.beta = 6.0
 
-        self.iou_loss = IOUloss(reduction="none")
+        self.iou_loss = IOUloss(reduction="none", loss_type="giou")
         self.bcewithlog_loss = nn.BCEWithLogitsLoss(reduction="none")
         self.l1_loss = nn.L1Loss(reduction="none")
 
@@ -34,12 +34,9 @@ class PPYOLOEXLoss:
         l1_targets = []
         obj_targets = []
         fg_masks = []
+        obj_matrixs = []
         num_fgs = 0
         num_gts = 0
-        assigned_scores = []
-        pred_scores = []
-        batch_ious = []
-        gt_matched_boxes = []
 
         for batch_idx in range(preds.shape[0]):
             num_gt = int(nlabel[batch_idx])
@@ -50,6 +47,8 @@ class PPYOLOEXLoss:
                 l1_target = preds.new_zeros((0, 4))
                 obj_target = preds.new_zeros((total_num_anchors, 1))
                 fg_mask = preds.new_zeros(total_num_anchors).bool()
+                obj_matrix = preds.new_ones(total_num_anchors)
+                # obj_matrix *= 1.0 / total_num_anchors
             else:
                 gt_bboxes_per_image = labels[batch_idx, :num_gt, 1:5]
                 gt_classes_per_image = labels[batch_idx, :num_gt, 0]
@@ -66,11 +65,10 @@ class PPYOLOEXLoss:
                         num_gt,
                     )
 
-                    fg_mask = fg_mask.unsqueeze(-1)
-                    bboxes_preds_per_image = bboxes_preds_per_image * fg_mask
-                    cls_preds_ = cls_preds[batch_idx] * fg_mask
-                    obj_preds_ = obj_preds[batch_idx] * fg_mask
-                    num_in_boxes_anchor = (fg_mask > 0).sum()
+                    bboxes_preds_per_image = bboxes_preds_per_image[fg_mask]
+                    cls_preds_ = cls_preds[batch_idx][fg_mask]
+                    obj_preds_ = obj_preds[batch_idx][fg_mask]
+                    num_in_boxes_anchor = bboxes_preds_per_image.shape[0]
 
                     pair_wise_ious = bboxes_iou(gt_bboxes_per_image, bboxes_preds_per_image, False)
                     # 以e为底的log函数，iou趋近1为0，iou为0趋近18.42
@@ -80,7 +78,7 @@ class PPYOLOEXLoss:
                         F.one_hot(gt_classes_per_image.to(torch.int64), self.num_classes)
                             .float()
                             .unsqueeze(1)
-                            .repeat(1, total_num_anchors, 1)
+                            .repeat(1, num_in_boxes_anchor, 1)
                     )
                     with torch.cuda.amp.autocast(enabled=False):
                         cls_preds_ = (
@@ -90,7 +88,8 @@ class PPYOLOEXLoss:
                         pair_wise_cls_loss = F.binary_cross_entropy(
                             cls_preds_.sqrt_(), gt_cls_per_image, reduction="none"
                         ).sum(-1)
-                        del cls_preds_
+
+                    candidate_mask = fg_mask.clone()
 
                     cost = (
                             pair_wise_cls_loss
@@ -101,27 +100,26 @@ class PPYOLOEXLoss:
                     # Dynamic k methods: select the final predictions.
                     (
                         fg_mask,
-                        matching_mask,
                         num_fg,
                         matched_gt_inds,
                         gt_matched_classes,
                         pred_ious_this_matching,
+                        final_mask
                     ) = dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes_per_image, num_gt)
-                    del pair_wise_cls_loss, cost, pair_wise_ious, pair_wise_ious_loss
+                    del pair_wise_cls_loss, cost, pair_wise_ious_loss
 
-                    gt_matched_box = gt_bboxes_per_image[matched_gt_inds]
+                    p_cls = cls_preds_[gt_cls_per_image.bool()]
+                    p_cls = p_cls.view(pair_wise_ious.shape)
+                    p_pos = p_cls * pair_wise_ious
+                    p_pos = p_pos.sum(0)[~final_mask]
+                    # p_pos_weight = (torch.exp(2 * p_pos) * p_pos).sum(0).clamp(min=EPS)
+                    p_pos_weight = p_pos * (p_pos.size(0) / p_pos.sum())
+                    obj_matrix = torch.ones_like(obj_preds[batch_idx]).squeeze()
+                    # obj_matrix *= 1.0/obj_matrix.size(0)
+                    obj_matrix[candidate_mask][~final_mask] = p_pos_weight
 
                 # predict anchors of the whole batch.
                 num_fgs += num_fg
-
-                pred_score = cls_preds[batch_idx].sigmoid() * obj_preds[batch_idx].sigmoid()
-                ious = bboxes_iou(gt_bboxes_per_image, bbox_preds[batch_idx], False)
-
-                pred_score = pred_score.repeat(num_gt, 1, 1)
-                ious = ious.unsqueeze(-1)
-                assigned_score = pred_score.pow(self.alpha) * ious.pow(self.beta)
-                pred_score *= matching_mask.unsqueeze(-1)
-                assigned_score *= matching_mask.unsqueeze(-1)
 
                 cls_target = F.one_hot(
                     gt_matched_classes.to(torch.int64), self.num_classes
@@ -134,43 +132,31 @@ class PPYOLOEXLoss:
                                             expanded_strides[0][fg_mask],
                                             x_shifts=x_shifts[0][fg_mask],
                                             y_shifts=y_shifts[0][fg_mask],)
-
-            gt_matched_boxes.append(gt_matched_box)
-            assigned_scores.append(assigned_score)
-            pred_scores.append(pred_score)
-            batch_ious.append(ious)
             cls_targets.append(cls_target)
             reg_targets.append(reg_target)
             obj_targets.append(obj_target.type_as(reg_target))
             fg_masks.append(fg_mask)
+            obj_matrixs.append(obj_matrix)
             if self.use_l1:
                 l1_targets.append(l1_target)
 
-        # all predict anchors of this batch images
-        assigned_scores = torch.cat(assigned_scores, 0)
-        pred_scores = torch.cat(pred_scores, 0)
-        batch_ious = torch.cat(batch_ious, 0)
-        gt_matched_boxes = torch.cat(gt_matched_boxes, 0)
         # all predict anchors of this batch images
         cls_targets = torch.cat(cls_targets, 0)
         reg_targets = torch.cat(reg_targets, 0)
         obj_targets = torch.cat(obj_targets, 0)
         fg_masks = torch.cat(fg_masks, 0)
+        obj_matrixs = torch.cat(obj_matrixs, 0)
         if self.use_l1:
             l1_targets = torch.cat(l1_targets, 0)
         num_fgs = max(num_fgs, 1)
 
         loss_iou = (self.iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)).sum() / num_fgs
 
-        loss_obj = (self.bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)).sum() / num_fgs
+        loss_obj = (obj_matrixs * self.bcewithlog_loss(obj_preds.view(-1, 1), obj_targets).squeeze()).sum() / \
+                   (num_fgs * preds.shape[0] * total_num_anchors)
 
-        iou = []
-        fg_boxes = bbox_preds.view(-1, 4)[fg_masks]
-        for fg_idx in range(len(gt_matched_boxes)):
-            iou.append(bboxes_iou(fg_boxes[fg_idx].repeat(1,1), gt_matched_boxes[fg_idx].repeat(1,1)))
-        iou = torch.cat(iou, 0)
-        loss_cls = (self.bcewithlog_loss(cls_preds.view(-1, self.num_classes)[fg_masks] * iou, cls_targets)).sum() / num_fgs
-        # loss_cls = (sigmoid_focal_loss(cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets, gamma=0)).sum() / num_fgs
+        loss_cls = (self.bcewithlog_loss(cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets)).sum() / num_fgs
+        # loss_cls = (sigmoid_focal_loss(cls_preds.view(-1, self.num_classes)[fg_masks], cls_targets, gamma=0))
 
         # L1loss is the distance among the four property of a predicted box.
         if self.use_l1:
@@ -321,7 +307,7 @@ def get_in_boxes_info(
     is_in_boxes_or_center = is_in_boxes_all | is_in_centers_all
 
     is_in_boxes_and_center = (
-            is_in_boxes & is_in_centers
+            is_in_boxes[:, is_in_boxes_or_center] & is_in_centers[:, is_in_boxes_or_center]
     )
     return is_in_boxes_or_center, is_in_boxes_and_center
 
@@ -344,8 +330,6 @@ def dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes, num_gt):
     """
     # ---------------------------------------------------------------
     matching_matrix = torch.zeros_like(cost)
-    score_mask = fg_mask.clone().repeat(num_gt, 1)
-    s_mask = torch.zeros_like(score_mask)
 
     ious_in_boxes_matrix = pair_wise_ious
     n_candidate_k = min(10, ious_in_boxes_matrix.size(1))
@@ -373,7 +357,7 @@ def dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes, num_gt):
     num_fg = fg_mask_inboxes.sum().detach()
 
     # 最终符合的anchor mask
-    fg_mask = fg_mask_inboxes
+    fg_mask[fg_mask.clone()] = fg_mask_inboxes
     # 先mask选择有分配的anchor，再取索引得到所属gt
     matched_gt_inds = matching_matrix[:, fg_mask_inboxes].argmax(0)  # 每个gt的k个anchor分给gt认领类别
     # k个anchor的类别获得
@@ -382,7 +366,7 @@ def dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes, num_gt):
     pred_ious_this_matching = (matching_matrix * pair_wise_ious).sum(0)[
         fg_mask_inboxes
     ]  # k个anchor的ious获得
-    return fg_mask, matching_matrix, num_fg, matched_gt_inds, gt_matched_classes, pred_ious_this_matching
+    return fg_mask, num_fg, matched_gt_inds, gt_matched_classes, pred_ious_this_matching, fg_mask_inboxes
 
 
 def get_l1_type(l1_target, gt, stride, x_shifts, y_shifts, eps=1e-8):

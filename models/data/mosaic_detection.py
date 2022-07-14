@@ -5,6 +5,7 @@ import numpy as np
 from torch.utils.data.dataset import Dataset
 from models.data.augmentation.cutpaste import cutpaste
 from models.data.augmentation.copypaste import copyPaste
+from models.data.augmentation.cutout_round import cutout_rounding
 from models.utils.bbox import bbox_ioa
 
 
@@ -14,7 +15,7 @@ class MosaicDetection(Dataset):
             mosaic_prob=1.0, mosaic_scale=(0.5, 1.5),
             degrees=10, translate=0.1, shear=2.0, perspective=0.0,
             copypaste_prob=0.0, copypaste_scale=(0.5, 1.5),
-            cutpaste_prob=0.0,
+            cutpaste_prob=0.0, cutoutR_prob=0.0
     ):
         """
         Args:
@@ -44,6 +45,11 @@ class MosaicDetection(Dataset):
         self.copypaste_prob = copypaste_prob
         self.copypaste_scale = copypaste_scale
         self.cutpaste_prob = cutpaste_prob
+        self.cutoutR_prob = cutoutR_prob
+        self.cr_nhole = (2, 4)
+        self.cr_ratio = [[0.2, 0.2], [0.2, 0.1], [0.1, 0.2]]
+        self.cr_mixup = 1.0
+        self.cr_ioa_thre = 0.2
 
     def __len__(self):
         return len(self._dataset)
@@ -65,15 +71,18 @@ class MosaicDetection(Dataset):
             for i_mosaic, index in enumerate(indices):
                 _labels, _, _, img_name = self._dataset.annotations[index]
                 if self._dataset.imgs is not None:
-                    img = self._dataset.imgs[index]
+                    ori_img = self._dataset.imgs[index]
                 else:
-                    img = self._dataset.load_resized_img(index)
+                    ori_img = self._dataset.load_resized_img(index)
+                img = ori_img.copy()
 
                 # augmentation before mosaic
                 if not len(_labels) == 0 and random.random() < self.copypaste_prob:
                     img, _labels = copyPaste(img, _labels, self._dataset.object_cls, self.copypaste_scale)
                 if random.random() < self.cutpaste_prob:
                     img = cutpaste(img, _labels, background=self._dataset.back_cls)
+                if random.random() < self.cutoutR_prob:
+                    img = cutout_rounding(img, _labels, self.cr_nhole, self.cr_ratio, self.cr_mixup, self.cr_ioa_thre)
 
                 h0, w0 = img.shape[:2]  # orig hw
                 scale = min(1. * input_h / h0, 1. * input_w / w0)
@@ -128,9 +137,10 @@ class MosaicDetection(Dataset):
             res, img_hw, resized_info, img_name = self._dataset.annotations[idx]
             self._dataset.img_size = self.img_size
             if self._dataset.imgs is not None:
-                img = self._dataset.imgs[idx]
+                ori_img = self._dataset.imgs[idx]
             else:
-                img = self._dataset.load_resized_img(idx)
+                ori_img = self._dataset.load_resized_img(idx)
+            img = ori_img.copy()
 
             # -----------------------------------------------------------------
             # CopyPaste: https://arxiv.org/abs/2012.07177
@@ -140,6 +150,8 @@ class MosaicDetection(Dataset):
                 img, res = copyPaste(img, res, self._dataset.object_cls, self.copypaste_scale)
             if random.random() < self.cutpaste_prob:
                 img = cutpaste(img, res, background=self._dataset.back_cls)
+            if random.random() < self.cutoutR_prob:
+                img = cutout_rounding(img, res, self.cr_nhole, self.cr_ratio, self.cr_mixup, self.cr_ioa_thre)
 
             if self.preprocess is not None:
                 img, target = self.preprocess(img, res, self.img_size)

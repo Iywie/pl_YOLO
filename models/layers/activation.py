@@ -3,6 +3,8 @@ import torch.nn.functional as F
 
 
 def get_activation(name="silu", inplace=True):
+    if name is None:
+        return None
     if name == "silu":
         module = nn.SiLU(inplace=inplace)
     elif name == "relu":

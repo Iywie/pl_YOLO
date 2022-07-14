@@ -9,3 +9,4 @@ torchvision
 thop
 onnx
 nni
+terminaltables

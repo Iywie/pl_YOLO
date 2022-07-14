@@ -6,7 +6,7 @@ from pytorch_lightning import LightningModule
 # Model
 from models.detectors.OneStage import OneStageD
 from models.backbones.darknet_csp import CSPDarkNet
-from models.necks.pafpn import PAFPN
+from models.necks.pafpn_csp import CSPPAFPN
 from models.heads.decoupled_head import DecoupledHead
 from models.heads.yolov5.yolov5_loss import YOLOv5Loss
 from models.heads.yolov5.yolov5_decoder import YOLOv5Decoder
@@ -54,7 +54,7 @@ class LitYOLOv5(LightningModule):
         self.iter_times = []
         # Model
         self.backbone = CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
-        self.neck = PAFPN(n_depth, n_channels, n_norm, n_act)
+        self.neck = CSPPAFPN(n_depth, n_channels, n_norm, n_act)
         self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         self.loss = YOLOv5Loss(self.num_classes, self.img_size_train, self.anchors, self.strides,
                                anchor_thre, balance)

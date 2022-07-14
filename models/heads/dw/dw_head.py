@@ -6,7 +6,7 @@ from torchvision.ops import deform_conv2d
 from models.layers.attention import SKFF
 
 
-class YOLOXSADecoupledHead(nn.Module):
+class DWHead(nn.Module):
     def __init__(
             self,
             num_classes=80,
@@ -35,6 +35,7 @@ class YOLOXSADecoupledHead(nn.Module):
         self.cls_attention = nn.ModuleList()
         self.reg_offset_conv1 = nn.ModuleList()
         self.reg_offset_conv2 = nn.ModuleList()
+        self.conv_centerness = nn.ModuleList()
 
         # For each feature map we go through different convolution.
         for i in range(len(in_channels)):
@@ -47,8 +48,8 @@ class YOLOXSADecoupledHead(nn.Module):
             self.implicitM.append(
                 ImplicitM(in_channels[0])
             )
-            # self.attention_cls.append(SALayer(in_channels[0], groups=int(64)))
-            # self.attention_reg.append(SALayer(in_channels[0], groups=int(64)))
+            self.attention_cls.append(SALayer(in_channels[0], groups=int(64)))
+            self.attention_reg.append(SALayer(in_channels[0], groups=int(64)))
 
             self.cls_convs.append(
                 nn.Sequential(
@@ -93,7 +94,9 @@ class YOLOXSADecoupledHead(nn.Module):
             self.reg_offset_conv2.append(
                 nn.Conv2d(in_channels[0], self.n_anchors * 8, kernel_size=(3, 3), stride=(1, 1), padding=1)
             )
-            self.relu = nn.ReLU(inplace=True)
+            self.conv_centerness.append(
+                nn.Conv2d(in_channels[0], 1, kernel_size=(3, 3), stride=(1, 1), padding=1)
+            )
 
     def initialize_biases(self, prior_prob):
         for conv in self.cls_preds:
@@ -114,13 +117,13 @@ class YOLOXSADecoupledHead(nn.Module):
             x = self.stems[k](x)
             x = x * self.implicitM[k]().expand_as(x)
 
-            # cls_x = self.attention_cls[k](x)
-            # reg_x = self.attention_reg[k](x)
-            cls_x = x
-            reg_x = x
+            cls_x = self.attention_cls[k](x)
+            reg_x = self.attention_reg[k](x)
 
-            # M = self.cls_prob_conv1[k](x)
-            # M = self.cls_prob_conv2[k](M)
+            M = self.cls_prob_conv1[k](x)
+            M = self.cls_prob_conv2[k](M)
+            O = self.reg_offset_conv1[k](x)
+            O = self.reg_offset_conv2[k](O)
 
             cls_feat = cls_conv(cls_x)
             cls_output = self.cls_preds[k](cls_feat)
@@ -132,19 +135,12 @@ class YOLOXSADecoupledHead(nn.Module):
             # weight = cls_output.new_ones(c, 1, 1, 1)
             # cls_output = deform_conv2d(cls_output, M, weight, mask=None)
 
-            O = self.reg_offset_conv1[k](cls_feat)
-            O = self.reg_offset_conv2[k](O)
-
             reg_feat = reg_conv(reg_x)
             obj_output = self.obj_preds[k](reg_feat)
-            b, c, h, w = reg_feat.shape
-            weight = reg_feat.new_ones(c, 1, 1, 1)
-            reg_feat = deform_conv2d(reg_feat, O, weight, mask=None)
-            # reg_feat = self.relu(reg_feat)
             reg_output = self.reg_preds[k](reg_feat)
-            # b, c, h, w = reg_output.shape
-            # weight = reg_output.new_ones(c, 1, 1, 1)
-            # reg_output = deform_conv2d(reg_output, O, weight, mask=None)
+            b, c, h, w = reg_output.shape
+            weight = reg_output.new_ones(c, 1, 1, 1)
+            reg_output = deform_conv2d(reg_output, O, weight, mask=None)
 
             # output: [batch_size, n_ch, h, w]
             output = torch.cat([reg_output, obj_output, cls_output], 1)

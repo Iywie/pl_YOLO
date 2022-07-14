@@ -14,7 +14,8 @@ def cutpaste(img, labels, background=None):
     else:
         return img.astype(np.uint8)
 
-    for i in range(random.randint(0, 10)):
+    num_patches = random.randint(1, 3)
+    for i in range(num_patches):
         if len(clss) > 0:
             cls = np.random.choice(clss)
             j = random.randint(0, len(background[cls])-1)
