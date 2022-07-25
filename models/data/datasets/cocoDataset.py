@@ -139,6 +139,7 @@ class COCODataset(Dataset):
         file_name = self.annotations[index][3]
         img_file = os.path.join(self.data_dir, self.name, file_name)
         img = cv2.imread(img_file)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         assert img is not None, f'The problem image is {file_name}'
         return img
 

@@ -23,7 +23,6 @@ from models.heads.yolox.yolox_sa_head import YOLOXSADecoupledHead
 # LOSS
 from models.heads.yolox.yolox_loss import YOLOXLoss
 
-
 CONFIGS = {
     # detection
     'yolox': LitYOLOX,
@@ -31,6 +30,7 @@ CONFIGS = {
     'yolov5': LitYOLOv5,
     'dwyolox': LitDWYOLOX,
 }
+
 
 def build_model(model_name):
     return CONFIGS[model_name]

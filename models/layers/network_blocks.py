@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from activation import get_activation
-from normalization import get_normalization
+from .activation import get_activation
+from .normalization import get_normalization
 
 
 class BaseConv(nn.Module):

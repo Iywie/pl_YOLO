@@ -47,7 +47,7 @@ class MosaicDetection(Dataset):
         self.cutpaste_prob = cutpaste_prob
         self.cutoutR_prob = cutoutR_prob
         self.cr_nhole = (2, 4)
-        self.cr_ratio = [[0.2, 0.2], [0.2, 0.1], [0.1, 0.2]]
+        self.cr_ratio = [[0.3, 0.3], [0.3, 0.1], [0.1, 0.3]]
         self.cr_mixup = 1.0
         self.cr_ioa_thre = 0.2
 

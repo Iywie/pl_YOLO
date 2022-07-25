@@ -17,6 +17,7 @@ from models.backbones.ghostnet import GhostNet
 from models.backbones.mobilenext import MobileNeXt
 from models.backbones.efficientrep import EfficientRep
 from models.backbones.darknet_new import NewCSPDarkNet
+from models.backbones.darknet_new2 import NewCSPDarkNet2
 
 # Necks
 from models.necks.pafpn_csp import CSPPAFPN
@@ -95,12 +96,13 @@ class LitYOLOX(LightningModule):
         # self.backbone = ResTV2(b_depth, b_channels, num_heads)
         # self.backbone = GhostNet(b_channels, out_features)
         # self.backbone = MobileNeXt(b_channels, out_features)
-        self.backbone = EfficientRep(b_depth, b_channels, out_features)
-        # self.backbone = NewCSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
+        # self.backbone = EfficientRep(b_depth, b_channels, out_features)
+        self.backbone = NewCSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
+        # self.backbone = NewCSPDarkNet2(b_depth, b_channels, out_features, b_norm, b_act)
 
         self.neck = None
-        # self.neck = CSPPAFPN(n_depth, n_channels, n_norm, n_act)
-        self.neck = NewPAFPN(n_depth, n_channels, n_norm, n_act)
+        self.neck = CSPPAFPN(n_depth, n_channels, n_norm, n_act)
+        # self.neck = NewPAFPN(n_depth, n_channels, n_norm, n_act)
 
         self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         # self.head = YOLORDecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
@@ -173,7 +175,8 @@ class LitYOLOX(LightningModule):
             json_list, self.trainer.datamodule.dataset_val)
         print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
         print(summary)
-        VOCEvaluator(data_list, self.trainer.datamodule.dataset_val)
+        VOCEvaluator(data_list, self.trainer.datamodule.dataset_val, iou_thr=0.5)
+        VOCEvaluator(data_list, self.trainer.datamodule.dataset_val, iou_thr=0.75)
 
         self.log("val/mAP", ap50_95, prog_bar=False)
         self.log("val/mAP50", ap50, prog_bar=False)

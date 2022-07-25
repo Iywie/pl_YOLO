@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from models.layers.activation import get_activation
+from models.layers.normalization import get_normalization
 from models.layers.network_blocks import BaseConv
 from models.backbones.swinv2 import Mlp, window_partition, window_reverse, WindowAttention
 from models.layers.drops import DropPath
@@ -120,7 +122,6 @@ class CSPLayer(nn.Module):
         """
         Args:
             in_channels (int): input channels.
-            out_channels (int): output channels.
             num_bottle (int): number of Bottlenecks. Default value: 1.
             shortcut (bool): residual operation.
             expansion (float): the number that hidden channels compared with output channels.
@@ -128,23 +129,29 @@ class CSPLayer(nn.Module):
             act (str): type of activation
         """
         super().__init__()
+        bottle_attn = None
         in_ch = in_channels // 2
         hidden_channels = int(in_ch * expansion)  # hidden channels
         self.conv1 = BaseConv(in_channels, in_ch, 1, stride=1, norm=norm, act=act)
         self.conv2 = BaseConv(in_channels, in_ch, 1, stride=1, norm=norm, act=act)
         self.m = nn.Sequential(
-            *[Bottleneck(in_ch, in_ch, 1, shortcut, 2.0, norm=norm, act=act, attn=attn)
+            *[Bottleneck(in_ch, in_ch, 1, shortcut, 2, norm=norm, act=act, attn=bottle_attn)
               for _ in range(num_bottle - 1)]
         )
-        # self.conv3 = BaseConv(in_channels, in_channels, 1, stride=1, norm=norm, act=act)
+        self.nonlinearity = get_activation(act)
+        self.use_attn = False
+        if attn is not None:
+            self.use_attn = True
+            self.attn = attn
 
     def forward(self, x):
-        # x_1 = self.conv1(x)
-        # x_2 = self.conv2(x)
-        x_2, x_1 = channel_shuffle(x)
+        x_1 = self.conv1(x)
+        x_2 = self.conv2(x)
         x_1 = self.m(x_1)
         x = torch.cat((x_2, x_1), dim=1)
-        # x = self.conv3(x)
+        if self.use_attn is True:
+            x = self.attn(x)
+        x = self.nonlinearity(x)
         return x
 
 
@@ -165,15 +172,11 @@ class Bottleneck(nn.Module):
         in_ch = in_channels
         out_ch = out_channels
         hidden_channels = int(out_ch * expansion)
-        # self.conv1 = BaseConv(in_ch, hidden_channels, 1, stride=1, norm=norm, act=act)
-        # self.conv2 = BaseConv(hidden_channels, hidden_channels, 3, stride=stride, groups=hidden_channels, norm=norm, act=act)
-        # self.conv3 = BaseConv(hidden_channels, out_ch, 1, stride=1, norm=norm, act=None)
-
-        self.conv0 = BaseConv(in_ch, in_ch, 3, stride=stride, groups=in_ch, norm=norm, act=act)
-        self.conv1 = BaseConv(in_ch, hidden_channels, 1, stride=1, norm=norm, act=act)
-        self.conv2 = BaseConv(hidden_channels, out_ch, 1, stride=1, norm=norm, act=act)
+        self.conv0 = BaseConv(in_ch, in_ch, 3, stride=stride, groups=in_ch, norm=norm, act=None)
+        self.conv1 = BaseConv(in_ch, hidden_channels, 1, stride=1, norm=None, act=act)
+        self.conv2 = BaseConv(hidden_channels, out_ch, 1, stride=1, norm=norm, act=None)
         self.conv3 = BaseConv(out_ch, out_ch, 3, stride=stride, groups=out_ch, norm=norm, act=None)
-
+        self.nonlinearity = get_activation(act)
         self.use_add = shortcut and in_channels == out_channels
         self.use_attn = False
         if attn is not None:
@@ -186,20 +189,12 @@ class Bottleneck(nn.Module):
         y = self.conv1(y)
         y = self.conv2(y)
         y = self.conv3(y)
-        if self.use_add:
-            y = y + x
         if self.use_attn is True:
             y = self.attn(y)
+        if self.use_add:
+            y = y + x
+        y = self.nonlinearity(y)
         return y
-
-
-def channel_shuffle(x):
-    batchsize, num_channels, height, width = x.data.size()
-    assert (num_channels % 4 == 0)
-    x = x.reshape(batchsize * num_channels // 2, 2, height * width)
-    x = x.permute(1, 0, 2)
-    x = x.reshape(2, -1, num_channels // 2, height, width)
-    return x[0], x[1]
 
 
 class SwinTransformerLayer(nn.Module):

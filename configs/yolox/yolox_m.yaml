@@ -1,0 +1,28 @@
+model: 'yolox'
+
+backbone:
+    name: cspdarknet
+    depths: [3,9,9,3]
+    input_channels: [48,96,192,384,768] # five blocks
+    output_features: [ "stage2", "stage3", "stage4" ]
+    normalization: "bn"
+    activation: "silu"
+
+neck:
+    # base
+    depths: [2,2,2,2]
+    input_channels: [128, 256, 512]
+    normalization: "bn"
+    activation: "silu"
+
+head:
+    name: "decoupled_head"
+
+optimizer:
+    name: "SGD"
+    learning_rate: 0.03
+    momentum: 0.9
+    weight_decay: 0.0005
+    lr_scheduler: "CosineWarmupScheduler"
+    warmup: 0.1
+    ema: True

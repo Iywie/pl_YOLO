@@ -1,15 +1,15 @@
 from pytorch_lightning import Trainer, seed_everything
-from utils.defaults import argument_parser, load_config
+from utils.defaults import train_argument_parser, load_config
 from utils.build_model import build_model
 from utils.build_data import build_data
 from utils.build_logger import build_logger
-from pytorch_lightning.callbacks import Timer
 
 
 def main():
-    args = argument_parser().parse_args()
-    configs = load_config(args.cfg)
+    # Read argument and model configs
+    args = train_argument_parser().parse_args()
 
+    configs = load_config(args.cfg)
     model = build_model(configs['model'])
     model = model(configs)
 
@@ -27,7 +27,7 @@ def main():
         accelerator="gpu",
         devices=1,
         max_epochs=300,
-        check_val_every_n_epoch=5,
+        check_val_every_n_epoch=1,
         log_every_n_steps=10,
         enable_progress_bar=True,
         logger=logger,
@@ -39,8 +39,8 @@ def main():
         # benchmark=False,
         # default_root_dir="lightning_logs",
         # detect_anomaly=True,
-        # limit_train_batches=20,
-        # limit_val_batches=2,
+        limit_train_batches=80,
+        limit_val_batches=40,
         # reload_dataloaders_every_n_epochs=10,
     )
 

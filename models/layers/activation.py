@@ -13,6 +13,8 @@ def get_activation(name="silu", inplace=True):
         module = nn.LeakyReLU(0.1, inplace=inplace)
     elif name == 'hswish':
         module = HSwish()
+    elif name == "gelu":
+        module = nn.GELU()
     else:
         raise AttributeError("Unsupported activation function type: {}".format(name))
     return module

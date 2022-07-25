@@ -17,17 +17,17 @@ def cutout_rounding(img, labels, n_hole, cutout_ratio, mixup, ioa_thre):
     d = labels[:, 3] < h-1
     fills = []
     for i in range(n_label):
-        if a[i] and b[i]:
-            left = img[int(labels[i, 1]) - 1:int(labels[i, 3]), int(labels[i, 0]) - 1:int(labels[i, 0])].mean(0)
+        if a[i]:
+            left = img[int(labels[i, 1]):int(labels[i, 3]), int(labels[i, 0]) - 1:int(labels[i, 0])].mean(0)
             fills.append(left)
-        if c[i] and b[i]:
-            top = img[int(labels[i, 1]) - 1:int(labels[i, 1]), int(labels[i, 0]):int(labels[i, 2]) + 1].mean(1)
+        if c[i]:
+            top = img[int(labels[i, 1]):int(labels[i, 3]), int(labels[i, 2]):int(labels[i, 2]) + 1].mean(0)
             fills.append(top)
-        if c[i] and d[i]:
-            right = img[int(labels[i, 1]):int(labels[i, 3]) + 1, int(labels[i, 2]):int(labels[i, 2]) + 1].mean(0)
+        if b[i]:
+            right = img[int(labels[i, 1])-1:int(labels[i, 1]), int(labels[i, 0]):int(labels[i, 2])].mean(1)
             fills.append(right)
-        if a[i] and d[i]:
-            bottom = img[int(labels[i, 3]):int(labels[i, 3]) + 1, int(labels[i, 0]) - 1:int(labels[i, 2])].mean(1)
+        if d[i]:
+            bottom = img[int(labels[i, 3]):int(labels[i, 3]) + 1, int(labels[i, 0]):int(labels[i, 2])].mean(1)
             fills.append(bottom)
 
     if len(fills) != 0:

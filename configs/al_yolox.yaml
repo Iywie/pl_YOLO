@@ -4,20 +4,20 @@ model: 'yolox'
 
 dataset:
     format: "COCO"
-    dir: 'F:\Code\Datasets\Detection\Aluminium\COCO'
-    num_classes: 7
+    dir: '../AL_COCO'
+    num_classes: 6
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
     train_size: [ 640,640 ]  # [224,224] [416,416] [640,640]
     val_size: [ 640,640 ]
-    train_batch_size: 1
+    train_batch_size: 8
     val_batch_size: 1
 
 backbone:
     # base
     depths: [ 3,9,9,3 ]
-    input_channels: [ 32, 64, 128, 256, 512 ] # five blocks
+    input_channels: [32,64,128, 256, 512] # five blocks
     output_features: [ "stage2", "stage3", "stage4" ]
     normalization: "bn"
     activation: "silu"
@@ -37,7 +37,7 @@ backbone:
 neck:
     # base
     depths: [ 1,1,1,1 ]
-    input_channels: [ 128, 256, 512 ]
+    input_channels: [128, 256, 512]
     normalization: "bn"
     activation: "silu"
 
@@ -71,6 +71,6 @@ transform:
     # CutPaste in mosaic
     cutpaste_prob: 0
     # Cutout rounding background
-    cutoutR_prob: 0.5
+    cutoutR_prob: 0
 
 
