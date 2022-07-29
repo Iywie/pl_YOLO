@@ -10,13 +10,13 @@ import math
 __all__ = ['mobilenext']
 
 
-class MobileNeXt(nn.Module):
+class MobileNext(nn.Module):
     def __init__(
             self,
             channels=(16, 32, 64, 128, 256),
             out_features=("stage2", "stage3", "stage4"),
     ):
-        super(MobileNeXt, self).__init__()
+        super().__init__()
         self.out_features = out_features
         # building first layer
         self.stem = nn.Sequential(

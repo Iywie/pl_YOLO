@@ -1,5 +1,5 @@
 # Parameters
-datamodule: 'neu-det'
+datamodule: 'coco'
 model: 'yolox'
 
 dataset:
@@ -15,27 +15,15 @@ dataset:
     val_batch_size: 1
 
 backbone:
-    # base
+    # CSPDarkNet
     depths: [ 2,6,6,2 ]
-    input_channels: [48,96,192,384,768]  # five blocks [48,96,192,384,768] [32,64,128,256,512]
+    input_channels: [48,96,192,384,768]
     output_features: [ "stage2", "stage3", "stage4" ]
     normalization: "bn"
     activation: "silu"
 
-    # ResNet
-    block: "BasicBlock"  # BottleNeck
-
-    # ConvNext
-    drop_path_rate: 0.0
-    layer_scale_init_value: 0.000001
-
-    # Swim
-    patch_size: [ 4, 4 ]
-    embed_dim: 96
-    num_heads: [ 3, 6, 12, 24 ]
-
 neck:
-    # base
+    # PAFPN
     depths: [ 2,2,2,2 ]
     input_channels: [192,384,768]
     normalization: "bn"

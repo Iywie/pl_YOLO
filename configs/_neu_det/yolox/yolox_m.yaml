@@ -1,43 +1,31 @@
 # Parameters
-datamodule: 'neu-det'
+datamodule: 'coco'
 model: 'yolox'
 
 dataset:
     format: "COCO"
-    dir: '../AL_COCO'
+    dir: 'F:\Code\Datasets\Detection\NEU_DET\COCO'
     num_classes: 6
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
-    train_size: [ 640,640 ]  # [224,224] [416,416] [640,640]
-    val_size: [ 640,640 ]
-    train_batch_size: 8
+    train_size: [224,224]  # [224,224] [416,416] [640,640]
+    val_size: [224,224]
+    train_batch_size: 16
     val_batch_size: 1
 
 backbone:
-    # base
-    depths: [ 3,9,9,3 ]
-    input_channels: [32,64,128, 256, 512] # five blocks
+    # CSPDarkNet
+    depths: [ 2,6,6,2 ]
+    input_channels: [48,96,192,384,768]
     output_features: [ "stage2", "stage3", "stage4" ]
     normalization: "bn"
     activation: "silu"
 
-    # ResNet
-    block: "BasicBlock"  # BottleNeck
-
-    # ConvNext
-    drop_path_rate: 0.0
-    layer_scale_init_value: 0.000001
-
-    # Swim
-    patch_size: [ 4, 4 ]
-    embed_dim: 96
-    num_heads: [ 3, 6, 12, 24 ]
-
 neck:
-    # base
-    depths: [ 1,1,1,1 ]
-    input_channels: [128, 256, 512]
+    # PAFPN
+    depths: [ 2,2,2,2 ]
+    input_channels: [192,384,768]
     normalization: "bn"
     activation: "silu"
 
@@ -46,7 +34,7 @@ head:
 
 optimizer:
     name: "SGD"
-    learning_rate: 0.03
+    learning_rate: 0.01
     momentum: 0.9
     weight_decay: 0.0005
     lr_scheduler: "CosineWarmupScheduler"
@@ -71,6 +59,4 @@ transform:
     # CutPaste in mosaic
     cutpaste_prob: 0
     # Cutout rounding background
-    cutoutR_prob: 0
-
-
+    cutoutR_prob: 0.5

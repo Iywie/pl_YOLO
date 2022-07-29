@@ -2,16 +2,16 @@ model: 'yolox'
 
 backbone:
     name: cspdarknet
-    depths: [2,6,6,2]
-    input_channels: [48,96,192,384,768] # five blocks
+    depths: [3,9,9,3]
+    input_channels: [64,128,256,512,1024] # five blocks
     output_features: [ "stage2", "stage3", "stage4" ]
     normalization: "bn"
     activation: "silu"
 
 neck:
     # base
-    depths: [2,2,2,2]
-    input_channels: [128, 256, 512]
+    depths: [3,3,3,3]
+    input_channels: [256,512,1024]
     normalization: "bn"
     activation: "silu"
 

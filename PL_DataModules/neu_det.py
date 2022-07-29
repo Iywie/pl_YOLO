@@ -7,7 +7,7 @@ from models.data.augmentation.data_augments import TrainTransform, ValTransform
 from torch.utils.data.sampler import BatchSampler, RandomSampler
 
 
-class NEUDataModule(pl.LightningDataModule):
+class COCODataModule(pl.LightningDataModule):
     def __init__(self, cfgs):
         super().__init__()
         self.dataset_train = None

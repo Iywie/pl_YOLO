@@ -19,5 +19,4 @@ class OneStageD(nn.Module):
         if self.neck is not None:
             x = self.neck(x)
         x = self.head(x)
-
         return x

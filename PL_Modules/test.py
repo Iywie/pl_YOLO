@@ -7,18 +7,36 @@ from models.detectors.OneStage import OneStageD
 
 # Backbones
 from models.backbones.darknet_csp import CSPDarkNet
+from models.backbones.resnet import ResNet
+from models.backbones.convnext import ConvNeXt
+from models.backbones.shufflenetv2 import ShuffleNetV2_Plus
+from models.backbones.mobilenetv3 import MobileNetV3_Small, MobileNetV3_Large
+from models.backbones.swinv2 import SwinTransformerV2
+from models.backbones.restv2 import ResTV2
+from models.backbones.ghostnet import GhostNet
+from models.backbones.mobilenext import MobileNext
+from models.backbones.efficientrep import EfficientRep
 from models.backbones.darknet_new import NewCSPDarkNet
+from models.backbones.darknet_new2 import NewCSPDarkNet2
 
 # Necks
 from models.necks.pafpn_csp import CSPPAFPN
 from models.necks.pafpn_new import NewPAFPN
 
 # Heads
-from models.heads.yolox.yolox_decoder import YOLOXDecoder
-from models.heads.dw.dw_head import DWHead
-from models.heads.dw.dw_loss import DWLoss
+from models.heads.decoupled_head import DecoupledHead
+from models.heads.yolor.yolor_decoupled_head import YOLORDecoupledHead
+from models.heads.pp_yoloe.ppyoloe_decoupled_head import PPYOLOEDecoupledHead
+from models.heads.yolox.yolox_sa_head import YOLOXSADecoupledHead
 
-from models.evaluators.coco import COCOEvaluator, convert_to_coco_format
+# Losses
+from models.heads.pp_yoloe.ppyoloe_yolox_loss import PPYOLOEXLoss
+from models.heads.yolox.yolox_loss import YOLOXLoss
+from models.heads.dw.dw_loss import DWLoss
+from models.heads.yolox.yolox_decoder import YOLOXDecoder
+
+from models.evaluators.coco import COCOEvaluator, format_outputs
+from models.evaluators.voc import VOCEvaluator
 # Data
 from models.utils.ema import ModelEMA
 from torch.optim import SGD, AdamW, Adam
@@ -27,7 +45,7 @@ from models.lr_scheduler import CosineWarmupScheduler
 from utils.flops import model_summary
 
 
-class LitDWYOLOX(LightningModule):
+class LitTEST(LightningModule):
 
     def __init__(self, cfgs):
         super().__init__()
@@ -42,6 +60,10 @@ class LitDWYOLOX(LightningModule):
         b_act = self.cb['activation']
         b_channels = self.cb['input_channels']
         out_features = self.cb['output_features']
+        block = self.cb['block']
+        drop_path_rate = self.cb['drop_path_rate']
+        layer_scale_init_value = self.cb['layer_scale_init_value']
+        num_heads = self.cb['num_heads']
         # neck parameters
         n_depth = self.cn['depths']
         n_channels = self.cn['input_channels']
@@ -67,7 +89,7 @@ class LitDWYOLOX(LightningModule):
         self.infr_times = []
         self.nms_times = []
         # Network
-        self.backbone = CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
+        # self.backbone = CSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
         # self.backbone = ResNet(block, b_depth, b_channels, out_features)
         # self.backbone = ConvNeXt(b_depth, b_channels, out_features, drop_path_rate, layer_scale_init_value)
         # self.backbone = ShuffleNetV2_Plus(b_channels, out_features)
@@ -77,18 +99,23 @@ class LitDWYOLOX(LightningModule):
         # self.backbone = ResTV2(b_depth, b_channels, num_heads)
         # self.backbone = GhostNet(b_channels, out_features)
         # self.backbone = MobileNeXt(b_channels, out_features)
-        # self.backbone = NewCSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
+        # self.backbone = EfficientRep(b_depth, b_channels, out_features)
+        self.backbone = NewCSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
+        # self.backbone = NewCSPDarkNet2(b_depth, b_channels, out_features, b_norm, b_act)
 
         self.neck = None
         self.neck = CSPPAFPN(n_depth, n_channels, n_norm, n_act)
         # self.neck = NewPAFPN(n_depth, n_channels, n_norm, n_act)
 
-        self.head = DWHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
+        self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         # self.head = YOLORDecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         # self.head = PPYOLOEDecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         # self.head = YOLOXSADecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
-        self.loss = DWLoss(self.num_classes, strides)
+
+        self.loss = YOLOXLoss(self.num_classes, strides)
         # self.loss = PPYOLOEXLoss(self.num_classes, strides)
+        # self.loss = DWLoss(self.num_classes, strides)
+
         self.decoder = YOLOXDecoder(self.num_classes, strides)
         self.model = OneStageD(self.backbone, self.neck, self.head)
         self.ema_model = None
@@ -103,7 +130,7 @@ class LitDWYOLOX(LightningModule):
     def on_train_start(self) -> None:
         if self.ema is True:
             self.ema_model = ModelEMA(self.model, 0.9998)
-        # model_summary(self.model, self.img_size_train, self.device)
+        model_summary(self.model, self.img_size_train, self.device)
 
     def training_step(self, batch, batch_idx):
         imgs, labels, _, _, _ = batch
@@ -137,20 +164,23 @@ class LitDWYOLOX(LightningModule):
         start_time = time.time()
         detections = self.decoder(output, self.confidence_threshold, self.nms_threshold)
         self.nms_times.append(time.time() - start_time)
-        detections = convert_to_coco_format(detections, image_id, img_hw, self.img_size_val,
-                                            self.trainer.datamodule.dataset_val.class_ids)
-        return detections
+        json_det, det = format_outputs(detections, image_id, img_hw, self.img_size_val,
+                                               self.trainer.datamodule.dataset_val.class_ids)
+        return json_det, det
 
     def validation_epoch_end(self, val_step_outputs):
-        detect_list = []
+        json_list = []
+        data_list = []
         for i in range(len(val_step_outputs)):
-            detect_list += val_step_outputs[i]
-        # evaluate(self.trainer.datamodule.dataset_val.gt_bboxes, detect_list)
+            json_list += val_step_outputs[i][0]
+            data_list += val_step_outputs[i][1]
         ap50_95, ap50, summary = COCOEvaluator(
-            detect_list, self.trainer.datamodule.dataset_val)
-
+            json_list, self.trainer.datamodule.dataset_val)
         print("Batch {:d}, mAP = {:.3f}, mAP50 = {:.3f}".format(self.current_epoch, ap50_95, ap50))
         print(summary)
+        VOCEvaluator(data_list, self.trainer.datamodule.dataset_val, iou_thr=0.5)
+        VOCEvaluator(data_list, self.trainer.datamodule.dataset_val, iou_thr=0.75)
+
         self.log("val/mAP", ap50_95, prog_bar=False)
         self.log("val/mAP50", ap50, prog_bar=False)
         if ap50_95 > self.ap50_95:

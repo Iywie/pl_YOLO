@@ -1,8 +1,8 @@
-from PL_DataModules.neu_det import NEUDataModule
+from PL_DataModules.neu_det import COCODataModule
 
 
 CONFIGS = {
-    'neu-det': NEUDataModule,
+    'coco': COCODataModule,
 }
 
 

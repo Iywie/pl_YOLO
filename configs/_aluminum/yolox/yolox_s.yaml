@@ -1,43 +1,31 @@
 # Parameters
-datamodule: 'neu-det'
+datamodule: 'coco'
 model: 'yolox'
 
 dataset:
     format: "COCO"
-    dir: '../NEU_COCO/'
+    dir: 'F:\Code\Datasets\Detection\Aluminium\COCO'
     num_classes: 6
     train: 'train'  # directory name of training image
     val: 'val'
     test: 'test'
-    train_size: [224,224]  # [224,224] [416,416] [640,640]
-    val_size: [224,224]
-    train_batch_size: 32
-    val_batch_size: 32
+    train_size: [640,640]  # [224,224] [416,416] [640,640]
+    val_size: [640,640]
+    train_batch_size: 2
+    val_batch_size: 1
 
 backbone:
-    # base
-    depths: [2, 2, 2, 2]
-    input_channels: [64, 128, 256, 512] # five blocks
-    output_features: ["stage2", "stage3", "stage4"]
+    # CSPDarkNet
+    depths: [ 2,6,6,2 ]
+    input_channels: [32,64,128,256,512]
+    output_features: [ "stage2", "stage3", "stage4" ]
     normalization: "bn"
     activation: "silu"
 
-    # ResNet
-    block: "BasicBlock"  # BottleNeck
-
-    # ConvNext
-    drop_path_rate: 0.0
-    layer_scale_init_value: 0.000001
-
-    # Swim
-    patch_size: [ 4, 4 ]
-    embed_dim: 96
-    num_heads: [ 3, 6, 12, 24 ]
-
 neck:
-    # base
-    depths: [1, 1, 1, 1]
-    input_channels: [128, 256, 512]
+    # PAFPN
+    depths: [ 2,2,2,2 ]
+    input_channels: [192,384,768]
     normalization: "bn"
     activation: "silu"
 
@@ -59,7 +47,7 @@ transform:
     flip_prob: 0.5
     # Mosaic transform
     mosaic_prob: 0.9
-    mosaic_scale: [0.1, 2.0]
+    mosaic_scale: [ 0.1, 2.0 ]
     # Affine transform after mosaic
     degrees: 0
     translate: 0.1
@@ -67,7 +55,8 @@ transform:
     perspective: 0.0
     # CopyPaste in mosaic
     copypaste_prob: 0
-    copypaste_scale: [0.5, 1.5]
+    copypaste_scale: [ 0.5, 1.5 ]
     # CutPaste in mosaic
     cutpaste_prob: 0
-
+    # Cutout rounding background
+    cutoutR_prob: 0.5
