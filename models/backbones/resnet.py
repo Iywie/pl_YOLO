@@ -16,8 +16,8 @@ class ResNet(nn.Module):
 
     def __init__(
             self, 
-            block, 
-            depths, 
+            block,
+            depths=(3, 4, 6, 3),
             channels=(64, 128, 256, 512),
             out_features=("stage2", "stage3", "stage4")
     ):

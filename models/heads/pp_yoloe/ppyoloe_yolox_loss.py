@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.losses.iou_loss import bboxes_iou, IOUloss
+from models.layers.losses.iou_loss import bboxes_iou, IOUloss
 
 
 class PPYOLOEXLoss:

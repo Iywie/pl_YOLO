@@ -55,12 +55,22 @@ def box_iou(box1, box2):
     return inter / (area1[:, None] + area2 - inter)  # iou = inter / (area1 + area2 - inter)
 
 
+def xyxy2xywh(bboxes):
+    # Convert nx4 boxes from [x1, y1, x2, y2] to [x1, y1, w, h] where x1y1=top-left, x2y2=bottom-right
+    y = bboxes.clone() if isinstance(bboxes, torch.Tensor) else np.copy(bboxes)
+    y[:, 2] = bboxes[:, 2] - bboxes[:, 0]
+    y[:, 3] = bboxes[:, 3] - bboxes[:, 1]
+    return y
+
+
 def xyxy2cxcywh(bboxes):
-    bboxes[:, 2] = bboxes[:, 2] - bboxes[:, 0]
-    bboxes[:, 3] = bboxes[:, 3] - bboxes[:, 1]
-    bboxes[:, 0] = bboxes[:, 0] + bboxes[:, 2] * 0.5
-    bboxes[:, 1] = bboxes[:, 1] + bboxes[:, 3] * 0.5
-    return bboxes
+    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where x1y1=top-left, x2y2=bottom-right
+    y = bboxes.clone() if isinstance(bboxes, torch.Tensor) else np.copy(bboxes)
+    y[:, 0] = (bboxes[:, 0] + bboxes[:, 2]) / 2  # x center
+    y[:, 1] = (bboxes[:, 1] + bboxes[:, 3]) / 2  # y center
+    y[:, 2] = bboxes[:, 2] - bboxes[:, 0]  # width
+    y[:, 3] = bboxes[:, 3] - bboxes[:, 1]  # height
+    return y
 
 
 def bbox_ioa(box1, box2):

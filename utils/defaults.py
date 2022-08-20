@@ -6,8 +6,8 @@ import argparse
 def train_argument_parser():
     parser = argparse.ArgumentParser("Joseph's PL_Modules")
     parser.add_argument("-n", "--experiment-name", type=str)
-    parser.add_argument("-c", "--model", type=str, default='', help='model.yaml path')
-    parser.add_argument("-d", "--dataset", type=str, default='', help='dataset.yaml path')
+    parser.add_argument("-c", "--model", type=str, help='model.yaml path')
+    parser.add_argument("-d", "--dataset", type=str, help='dataset.yaml path')
     parser.add_argument("-l", "--logger", type=str, default='', help='model.yaml path')
     parser.add_argument("--data_path", type=str, default=None, help='dataset path reset')
     parser.add_argument("-v", "--version", type=str, default=None, help='experiment version')
@@ -20,35 +20,13 @@ def export_argument_parser():
     parser = argparse.ArgumentParser("YWDetection onnx deploy")
     parser.add_argument("-c", "--cfg", type=str, default='', help='model.yaml path')
     parser.add_argument("--ckpt", default=None, type=str, help="checkpoint file")
-    parser.add_argument(
-        "--output-name", type=str, default="wtf.onnx", help="output name of models"
-    )
-    parser.add_argument(
-        "--input", default="images", type=str, help="input node name of onnx model"
-    )
-    parser.add_argument(
-        "--output", default="output", type=str, help="output node name of onnx model"
-    )
-    parser.add_argument(
-        "-o", "--opset", default=12, type=int, help="onnx opset version"
-    )
+    parser.add_argument("--output-name", type=str, default="wtf.onnx", help="output name of models")
+    parser.add_argument("--input", default="images", type=str, help="input node name of onnx model")
+    parser.add_argument("--output", default="output", type=str, help="output node name of onnx model")
+    parser.add_argument("-o", "--opset", default=12, type=int, help="onnx opset version")
     parser.add_argument("--batch-size", type=int, default=1, help="batch size")
-    parser.add_argument(
-        "--dynamic", action="store_true", help="whether the input shape should be dynamic or not"
-    )
+    parser.add_argument("--dynamic", action="store_true", help="whether the input shape should be dynamic or not")
     parser.add_argument("--no-onnxsim", action="store_true", help="use onnxsim or not")
-    parser.add_argument(
-        "opts",
-        help="Modify config options using the command-line",
-        default=None,
-        nargs=argparse.REMAINDER,
-    )
-    parser.add_argument(
-        "--decode_in_inference",
-        action="store_true",
-        help="decode in inference or not"
-    )
-
     return parser
 
 

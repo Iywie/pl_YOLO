@@ -1,45 +1,19 @@
 # Parameters
 datamodule: 'coco'
-model: 'yolox'
 
 dataset:
-    format: "COCO"
-    dir: 'F:\Code\Datasets\Detection\GC10\COCO'
-    num_classes: 10
+    dir: 'F:\Code\Datasets\Images\Detection\Aluminium\COCO'
+    num_classes: 6
     train: 'train'  # directory name of training image
+    train_json: 'annotations/train.json'
     val: 'val'
+    val_json: 'annotations/val.json'
     test: 'test'
+    test_json: 'annotations/test.json'
     train_size: [640,640]  # [224,224] [416,416] [640,640]
     val_size: [640,640]
     train_batch_size: 8
-    val_batch_size: 1
-
-backbone:
-    # CSPDarkNet
-    depths: [ 2,6,6,2 ]
-    input_channels: [48,96,192,384,768]
-    output_features: [ "stage2", "stage3", "stage4" ]
-    normalization: "bn"
-    activation: "silu"
-
-neck:
-    # PAFPN
-    depths: [ 2,2,2,2 ]
-    input_channels: [192,384,768]
-    normalization: "bn"
-    activation: "silu"
-
-head:
-    name: "decoupled_head"
-
-optimizer:
-    name: "SGD"
-    learning_rate: 0.01
-    momentum: 0.9
-    weight_decay: 0.0005
-    lr_scheduler: "CosineWarmupScheduler"
-    warmup: 0.1
-    ema: True
+    val_batch_size: 8
 
 transform:
     # Train transform
@@ -60,3 +34,5 @@ transform:
     cutpaste_prob: 0
     # Cutout rounding background
     cutoutR_prob: 0.5
+
+classes: [bdd, jwld, jp, ld, qk, zs]  # [不导电, 角位漏底, 桔皮, 漏底, 起坑, 杂色]

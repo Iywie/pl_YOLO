@@ -1,7 +1,5 @@
 import torch
-from thop import profile
-from thop import clever_format
-from nni.compression.pytorch.utils.counter import count_flops_params
+from thop import profile, clever_format
 
 
 def model_summary(model, train_size, device):

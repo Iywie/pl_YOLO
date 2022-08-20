@@ -9,8 +9,6 @@ Depths:
     xlarge: depths=[3, 3, 27, 3], dims=[256, 512, 1024, 2048]
 """
 
-
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,7 +19,6 @@ class ConvNeXt(nn.Module):
     r"""
 
     Args:
-        in_chans (int): Number of input image channels. Default:
         depths (tuple(int)): Number of blocks at each stage. Default: [3, 3, 9, 3]
         dims (list): Feature dimension at each stage. Default: [96, 192, 384, 768]
         drop_path_rate (float): Stochastic depth rate. Default: 0.

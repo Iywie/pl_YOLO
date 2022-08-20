@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.losses.iou_loss import bboxes_iou, IOUloss
+from models.layers.losses.iou_loss import bboxes_iou, IOUloss
 
 
 class YOLOXLoss:
@@ -71,9 +71,9 @@ class YOLOXLoss:
 
                     gt_cls_per_image = (
                         F.one_hot(gt_classes_per_image.to(torch.int64), self.num_classes)
-                            .float()
-                            .unsqueeze(1)
-                            .repeat(1, num_in_boxes_anchor, 1)
+                        .float()
+                        .unsqueeze(1)
+                        .repeat(1, num_in_boxes_anchor, 1)
                     )
                     with torch.cuda.amp.autocast(enabled=False):
                         cls_preds_ = (
@@ -114,7 +114,7 @@ class YOLOXLoss:
                                             gt_bboxes_per_image[matched_gt_inds],
                                             expanded_strides[0][fg_mask],
                                             x_shifts=x_shifts[0][fg_mask],
-                                            y_shifts=y_shifts[0][fg_mask],)
+                                            y_shifts=y_shifts[0][fg_mask], )
             cls_targets.append(cls_target)
             reg_targets.append(reg_target)
             obj_targets.append(obj_target.type_as(reg_target))
@@ -146,7 +146,15 @@ class YOLOXLoss:
         reg_weight = 5.0
         loss = reg_weight * loss_iou + loss_obj + loss_cls + loss_l1
 
-        return loss, loss_iou, loss_obj, loss_cls, loss_l1, num_fgs / max(num_gts, 1)
+        loss_dict = {
+            "loss": loss,
+            "loss_iou": loss_iou,
+            "loss_obj": loss_obj,
+            "loss_cls": loss_cls,
+            "loss_l1": loss_l1,
+            "proportion": num_fgs / max(num_gts, 1),
+        }
+        return loss_dict
 
     def decode(self, inputs):
         """
@@ -224,23 +232,23 @@ def get_in_boxes_info(
 
     gt_bboxes_per_image_l = (
         (gt_bboxes_per_image[:, 0] - 0.5 * gt_bboxes_per_image[:, 2])
-            .unsqueeze(1)
-            .repeat(1, total_num_anchors)
+        .unsqueeze(1)
+        .repeat(1, total_num_anchors)
     )
     gt_bboxes_per_image_r = (
         (gt_bboxes_per_image[:, 0] + 0.5 * gt_bboxes_per_image[:, 2])
-            .unsqueeze(1)
-            .repeat(1, total_num_anchors)
+        .unsqueeze(1)
+        .repeat(1, total_num_anchors)
     )
     gt_bboxes_per_image_t = (
         (gt_bboxes_per_image[:, 1] - 0.5 * gt_bboxes_per_image[:, 3])
-            .unsqueeze(1)
-            .repeat(1, total_num_anchors)
+        .unsqueeze(1)
+        .repeat(1, total_num_anchors)
     )
     gt_bboxes_per_image_b = (
         (gt_bboxes_per_image[:, 1] + 0.5 * gt_bboxes_per_image[:, 3])
-            .unsqueeze(1)
-            .repeat(1, total_num_anchors)
+        .unsqueeze(1)
+        .repeat(1, total_num_anchors)
     )
 
     # 找出中心点在gt中的grid（许多）
@@ -292,7 +300,6 @@ def get_in_boxes_info(
 
 
 def dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes, num_gt):
-    # Dynamic K
     """
     :param fg_mask: 所有anchor中初步符合的anchor mask
     :param cost: anchors的损失矩阵
@@ -305,7 +312,6 @@ def dynamic_k_matching(fg_mask, cost, pair_wise_ious, gt_classes, num_gt):
         matched_gt_inds: 参与预测的anchor所对应的ground truth
         gt_matched_classes: 参与预测的anchor各自所属的类别（跟随ground truth）
         pred_ious_this_matching: 参与预测的anchor与其所对应的ground truth的iou
-
     """
     # ---------------------------------------------------------------
     matching_matrix = torch.zeros_like(cost)

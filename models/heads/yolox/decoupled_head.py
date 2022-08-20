@@ -4,7 +4,7 @@ import torch.nn as nn
 from models.layers.network_blocks import BaseConv
 
 
-class YOLORDecoupledHead(nn.Module):
+class DecoupledHead(nn.Module):
     def __init__(
             self,
             num_classes=80,
@@ -24,20 +24,13 @@ class YOLORDecoupledHead(nn.Module):
         self.reg_convs = nn.ModuleList()
         self.reg_preds = nn.ModuleList()
         self.obj_preds = nn.ModuleList()
-        self.implicitA = nn.ModuleList()
-        self.implicitM = nn.ModuleList()
 
         # For each feature map we go through different convolution.
         for i in range(len(in_channels)):
-            self.implicitA.append(
-                ImplicitA(in_channels[i])
-            )
             self.stems.append(
                 BaseConv(in_channels[i], in_channels[0], ksize=1, stride=1, act=act)
             )
-            self.implicitM.append(
-                ImplicitM(in_channels[0])
-            )
+
             self.cls_convs.append(
                 nn.Sequential(
                     *[
@@ -68,6 +61,8 @@ class YOLORDecoupledHead(nn.Module):
                 nn.Conv2d(in_channels[0], self.n_anchors * 1, kernel_size=(1, 1), stride=(1, 1), padding=0)
             )
 
+        self.initialize_biases(1e-2)
+
     def initialize_biases(self, prior_prob):
         for conv in self.cls_preds:
             b = conv.bias.view(self.n_anchors, -1)
@@ -82,10 +77,8 @@ class YOLORDecoupledHead(nn.Module):
     def forward(self, inputs):
         outputs = []
         for k, (cls_conv, reg_conv, x) in enumerate(zip(self.cls_convs, self.reg_convs, inputs)):
-            x = x + self.implicitA[k]().expand_as(x)
             # Change all inputs to the same channel.
             x = self.stems[k](x)
-            x = x * self.implicitM[k]().expand_as(x)
 
             cls_x = x
             reg_x = x
@@ -100,25 +93,3 @@ class YOLORDecoupledHead(nn.Module):
             output = torch.cat([reg_output, obj_output, cls_output], 1)
             outputs.append(output)
         return outputs
-
-
-class ImplicitA(nn.Module):
-    def __init__(self, channel):
-        super(ImplicitA, self).__init__()
-        self.channel = channel
-        self.implicit = nn.Parameter(torch.zeros(1, channel, 1, 1))
-        nn.init.normal_(self.implicit, std=.02)
-
-    def forward(self):
-        return self.implicit
-
-
-class ImplicitM(nn.Module):
-    def __init__(self, channel):
-        super(ImplicitM, self).__init__()
-        self.channel = channel
-        self.implicit = nn.Parameter(torch.ones(1, channel, 1, 1))
-        nn.init.normal_(self.implicit, mean=1., std=.02)
-
-    def forward(self):
-        return self.implicit

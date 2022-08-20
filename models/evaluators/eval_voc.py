@@ -4,54 +4,25 @@ from multiprocessing import Pool
 from models.utils.bbox import bbox_overlaps
 
 
-def VOCEvaluator(data_list, val_dataset, iou_thr=0.5):
+def VOCEvaluator(det_list, val_dataset, iou_thr=0.5):
     """
     Args:
-            data_list (list[list]): [[cls1_det, cls2_det, ...], ...].
-                The outer list indicates images, and the inner list indicates
-                per-class detected bboxes.
-            val_dataset
-            iou_thr
+            det_list (list[list]): [[cls1_det, cls2_det, ...], ...].
+                The outer list indicates images, and the inner list indicates per-class detected bboxes.
+            gt_list
+                The outer list indicates images, and the inner list indicates per-class gt bboxes.
     """
-    num_dets = 0
-    for i in range(len(data_list)):
-        for j in range(len(val_dataset.class_ids)):
-            num_dets += data_list[i][j].shape[0]
-    if num_dets == 0:
-        print("No detection!")
-        return None
 
     pool = Pool(8)
-    num_imgs = len(data_list)
-    annotations = val_dataset.gt_bboxes  # (label, val_size, img_size, img_name)
-    if len(annotations) != num_imgs:
-        print("No detection!")
-        return None
+    gt_list = val_dataset.gt_bboxes
+    num_imgs = len(gt_list)
     class_ids = val_dataset.class_ids
     eval_results = []
-
     num_classes = len(class_ids)
+
     for i in range(num_classes):
-        # cls_dets = [img_res[i] for img_res in data_list]
-        cls_dets = []
-        cls_gts = []
-        det_list = data_list.copy()
-        for ann in annotations:
-            image_id = ann['image_id']
-            cls_det = None
-            for j in range(len(det_list)):
-                if det_list[j][-1] == image_id:
-                    gt_ind = ann['bboxes'][:, -1] == i
-                    cls_gts.append(ann['bboxes'][gt_ind, 0:4])
-                    cls_det = det_list[j][i]
-                    cls_dets.append(cls_det)
-                    det_list.pop(j)
-                    break
-            if cls_det is None:
-                print("image %d is not compatible with the validation dataset!")
-                gt_ind = ann['bboxes'][:, -1] == i
-                cls_gts.append(ann['bboxes'][gt_ind, 0:4])
-                cls_dets.append(np.empty(shape=[0, 5]))
+        cls_dets = [img_res[i] for img_res in det_list]
+        cls_gts = [img_res[i] for img_res in gt_list]
 
         tpfp = pool.starmap(
             tpfp_default,

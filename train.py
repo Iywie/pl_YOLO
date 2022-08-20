@@ -1,37 +1,44 @@
 from pytorch_lightning import Trainer, seed_everything
 from utils.defaults import train_argument_parser, load_config
-from utils.build_model import build_model
 from utils.build_data import build_data
 from utils.build_logger import build_logger
+from pytorch_lightning.callbacks import ModelCheckpoint
+from PL_Modules.build_detection import build_model
+from PL_Modules.pl_detection import LitDetection
 
 
 def main():
-    # Read argument and model configs
     args = train_argument_parser().parse_args()
 
-    configs = load_config(args.cfg)
-    model = build_model(configs['model'])
-    model = model(configs)
+    data_cfgs = load_config(args.dataset)
+    data = build_data(data_cfgs['datamodule'])
+    data = data(data_cfgs)
 
-    if args.data is not None:
-        configs['dataset']['dir'] = args.data
-    data = build_data(configs['datamodule'])
-    data = data(configs)
+    model_cfgs = load_config(args.model)
+    model = build_model(model_cfgs)
+    lightning = LitDetection(model, model_cfgs, data_cfgs)
 
-    logger = build_logger(args.logger, model, configs, args.version)
+    logger = build_logger(args.logger, model, model_cfgs, args.version)
 
     seed_everything(96, workers=True)
 
-    # https://pytorch-lightning.readthedocs.io/en/latest/api/pytorch_lightning.trainer.trainer.Trainer.html?highlight=trainer
+    checkpoint_callback = ModelCheckpoint(
+        save_top_k=5,
+        monitor='mAP',
+        dirpath='logs/',
+        mode="max",
+        filename='{epoch:02d}-{mAP:.2f}'
+    )
+
     trainer = Trainer(
         accelerator="gpu",
         devices=1,
         max_epochs=300,
-        check_val_every_n_epoch=1,
+        check_val_every_n_epoch=5,
         log_every_n_steps=10,
         enable_progress_bar=True,
         logger=logger,
-        # callbacks=[timer],
+        callbacks=[checkpoint_callback],
         # precision=16,
         # amp_backend="apex",
         # amp_level=01,
@@ -39,15 +46,15 @@ def main():
         # benchmark=False,
         # default_root_dir="lightning_logs",
         # detect_anomaly=True,
-        limit_train_batches=80,
-        limit_val_batches=40,
+        # limit_train_batches=80,
+        # limit_val_batches=40,
         # reload_dataloaders_every_n_epochs=10,
     )
 
-    trainer.fit(model, datamodule=data)
-    # trainer.tune(model, datamodule=data)
-    # trainer.validate(model, datamodule=data, ckpt_path='lightning_logs/version_0/checkpoints/epoch=44-step=4050.ckpt')
-    # trainer.test(model, datamodule=data)
+    trainer.fit(lightning, datamodule=data, ckpt_path='logs/epoch=29-mAP=0.22.ckpt')
+    # trainer.tune(lightning, datamodule=data)
+    # trainer.validate(lightning, datamodule=data, ckpt_path='')
+    # trainer.test(lightning, datamodule=data)
 
 
 if __name__ == "__main__":

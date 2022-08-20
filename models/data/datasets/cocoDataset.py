@@ -21,6 +21,7 @@ class COCODataset(Dataset):
     def __init__(self,
                  data_dir,
                  name,
+                 json,
                  img_size,
                  preprocess=None,
                  cache=False,
@@ -30,9 +31,9 @@ class COCODataset(Dataset):
         self.name = name
         self.img_size = img_size
         self.preprocess = preprocess
-        self.json_file = name + ".json"
+        self.json_file = json
 
-        self.coco = COCO(os.path.join(self.data_dir, "annotations", self.json_file))
+        self.coco = COCO(os.path.join(self.data_dir, self.json_file))
         self.ids = self.coco.getImgIds()
         self.class_ids = sorted(self.coco.getCatIds())
         self.annotations = self._load_coco_annotations()
@@ -41,12 +42,10 @@ class COCODataset(Dataset):
         self.imgs = None
         if cache:
             self._cache_images()
-        else:
-            self.imgs = self._load_imgs()
 
         # Background imgs and blocks
-        self.back_blocks, self.back_cls, self.object_cls = getBackground(
-            self.imgs, self.annotations, self.class_ids)
+        # self.back_blocks, self.back_cls, self.object_cls = getBackground(
+        #     self.imgs, self.annotations, self.class_ids)
 
     def __len__(self):
         return len(self.ids)
@@ -117,13 +116,10 @@ class COCODataset(Dataset):
         file_name = (
             im_ann["file_name"]
             if "file_name" in im_ann
-            else "{:012}".format(id) + ".jpg"
+            else "{:012}".format(id_) + ".jpg"
         )
 
         return res, img_hw, resized_hw, file_name
-
-    def _load_imgs(self):
-        return [self.load_resized_img(_id) for _id in self.ids]
 
     def load_resized_img(self, index):
         img = self.load_image(index)
@@ -166,29 +162,28 @@ class COCODataset(Dataset):
             pbar.desc = f'Caching images ({gb / 1E9:.1f}GB)'
         pbar.close()
 
-    # def _get_gtbbox(self):
-    #     gt_bbox = []
-    #     for i in range(len(self)):
-    #         box = self.annotations[i][0][:, :4]
-    #         cls = self.annotations[i][0][:, [4]]
-    #         img_id = self.ids[i]
-    #         for j in range(box.shape[0]):
-    #             bbox = {'box': box[j], 'cls': self.class_ids[int(cls[j])], 'img_id': img_id}
-    #             gt_bbox.append(bbox)
-    #     return gt_bbox
-
     def _get_gtbbox(self):
         return [self.get_gtbbox(_id) for _id in self.ids]
 
     def get_gtbbox(self, id_):
+        gtbbox_list = [np.empty(shape=[0, 4]) for _ in range(len(self.class_ids))]
         anno_ids = self.coco.getAnnIds(imgIds=[id_], iscrowd=False)
         annotation = self.coco.loadAnns(anno_ids)
-        bboxes = []
-        for obj in annotation:
+        num_gt = len(annotation)
+        for i in range(num_gt):
+            obj = annotation[i]
             bbox = obj['bbox'].copy()
             bbox = x1y1wh2xyxy(np.array(bbox))
             cls = self.class_ids.index(obj["category_id"])
-            bbox = np.append(bbox, cls)
-            bboxes.append(bbox)
+            gtbbox_list[cls] = np.append(gtbbox_list[cls], bbox[np.newaxis, :], axis=0)
+        return gtbbox_list
 
-        return {'bboxes': np.array(bboxes), 'image_id': id_}
+        # # a = np.zeros(shape=(120, 5))
+        # for i in range(len(annotation)):
+        # #     obj = annotation[i]
+        # #     bbox = obj['bbox'].copy()
+        # #     bbox = x1y1wh2xyxy(np.array(bbox))
+        # #     cls = self.class_ids.index(obj["category_id"])
+        # #     bbox = np.append(bbox, cls)
+        # #     a[i] = bbox
+        # # return {'bboxes': a, 'image_id': id_}

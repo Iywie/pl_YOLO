@@ -6,64 +6,44 @@ from pytorch_lightning import LightningModule
 from models.detectors.OneStage import OneStageD
 
 # Backbones
-from models.backbones.darknet_csp import CSPDarkNet
-from models.backbones.resnet import ResNet
-from models.backbones.convnext import ConvNeXt
-from models.backbones.shufflenetv2 import ShuffleNetV2_Plus
-from models.backbones.mobilenetv3 import MobileNetV3_Small, MobileNetV3_Large
-from models.backbones.swinv2 import SwinTransformerV2
-from models.backbones.restv2 import ResTV2
-from models.backbones.ghostnet import GhostNet
-from models.backbones.mobilenext import MobileNext
-from models.backbones.efficientrep import EfficientRep
-from models.backbones.darknet_new import NewCSPDarkNet
 from models.backbones.darknet_new2 import NewCSPDarkNet2
 
 # Necks
-from models.necks.pafpn_csp import CSPPAFPN
 from models.necks.pafpn_new import NewPAFPN
 
 # Heads
-from models.heads.decoupled_head import DecoupledHead
-from models.heads.yolor.yolor_decoupled_head import YOLORDecoupledHead
-from models.heads.pp_yoloe.ppyoloe_decoupled_head import PPYOLOEDecoupledHead
-from models.heads.yolox.yolox_sa_head import YOLOXSADecoupledHead
+from models.heads.yolox.decoupled_head import DecoupledHead
 
 # Losses
-from models.heads.pp_yoloe.ppyoloe_yolox_loss import PPYOLOEXLoss
 from models.heads.yolox.yolox_loss import YOLOXLoss
-from models.heads.dw.dw_loss import DWLoss
 from models.heads.yolox.yolox_decoder import YOLOXDecoder
 
-from models.evaluators.coco import COCOEvaluator, format_outputs
-from models.evaluators.voc import VOCEvaluator
+from models.evaluators.postprocess import postprocess, format_outputs
+from models.evaluators.eval_coco import COCOEvaluator
+from models.evaluators.eval_voc import VOCEvaluator
 # Data
 from models.utils.ema import ModelEMA
-from torch.optim import SGD, AdamW, Adam
+from torch.optim import SGD
 
-from models.lr_scheduler import CosineWarmupScheduler
+from models.layers.lr_scheduler import CosineWarmupScheduler
 from utils.flops import model_summary
 
 
 class LitTEST(LightningModule):
 
-    def __init__(self, cfgs):
+    def __init__(self, model_cfgs, data_cfgs):
         super().__init__()
-        self.cb = cfgs['backbone']
-        self.cn = cfgs['neck']
-        self.ch = cfgs['head']
-        self.cd = cfgs['dataset']
-        self.co = cfgs['optimizer']
+        self.cb = model_cfgs['backbone']
+        self.cn = model_cfgs['neck']
+        self.ch = model_cfgs['head']
+        self.co = model_cfgs['optimizer']
+        self.cd = data_cfgs['dataset']
         # backbone parameters
         b_depth = self.cb['depths']
         b_norm = self.cb['normalization']
         b_act = self.cb['activation']
         b_channels = self.cb['input_channels']
         out_features = self.cb['output_features']
-        block = self.cb['block']
-        drop_path_rate = self.cb['drop_path_rate']
-        layer_scale_init_value = self.cb['layer_scale_init_value']
-        num_heads = self.cb['num_heads']
         # neck parameters
         n_depth = self.cn['depths']
         n_channels = self.cn['input_channels']
@@ -100,12 +80,12 @@ class LitTEST(LightningModule):
         # self.backbone = GhostNet(b_channels, out_features)
         # self.backbone = MobileNeXt(b_channels, out_features)
         # self.backbone = EfficientRep(b_depth, b_channels, out_features)
-        self.backbone = NewCSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
-        # self.backbone = NewCSPDarkNet2(b_depth, b_channels, out_features, b_norm, b_act)
+        # self.backbone = NewCSPDarkNet(b_depth, b_channels, out_features, b_norm, b_act)
+        self.backbone = NewCSPDarkNet2(b_depth, b_channels, out_features, b_norm, b_act)
 
         self.neck = None
-        self.neck = CSPPAFPN(n_depth, n_channels, n_norm, n_act)
-        # self.neck = NewPAFPN(n_depth, n_channels, n_norm, n_act)
+        # self.neck = CSPPAFPN(n_depth, n_channels, n_norm, n_act)
+        self.neck = NewPAFPN(n_depth, n_channels, n_norm, n_act)
 
         self.head = DecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
         # self.head = YOLORDecoupledHead(self.num_classes, n_anchors, n_channels, n_norm, n_act)
@@ -136,7 +116,7 @@ class LitTEST(LightningModule):
         imgs, labels, _, _, _ = batch
         output = self.model(imgs)
         loss, loss_iou, loss_obj, loss_cls, loss_l1, proportion = self.loss(output, labels)
-        self.log("loss/loss", loss, prog_bar=True)
+        self.log("loss", loss, prog_bar=True)
         self.log("loss/iou", loss_iou, prog_bar=False)
         self.log("loss/obj", loss_obj, prog_bar=False)
         self.log("loss/cls", loss_cls, prog_bar=False)
@@ -162,10 +142,11 @@ class LitTEST(LightningModule):
         output = model(imgs)
         self.infr_times.append(time.time() - start_time)
         start_time = time.time()
-        detections = self.decoder(output, self.confidence_threshold, self.nms_threshold)
+        detections = self.decoder(output)
+        detections = postprocess(detections, self.confidence_threshold, self.nms_threshold)
         self.nms_times.append(time.time() - start_time)
         json_det, det = format_outputs(detections, image_id, img_hw, self.img_size_val,
-                                               self.trainer.datamodule.dataset_val.class_ids)
+                                       self.trainer.datamodule.dataset_val.class_ids)
         return json_det, det
 
     def validation_epoch_end(self, val_step_outputs):
@@ -181,8 +162,8 @@ class LitTEST(LightningModule):
         VOCEvaluator(data_list, self.trainer.datamodule.dataset_val, iou_thr=0.5)
         VOCEvaluator(data_list, self.trainer.datamodule.dataset_val, iou_thr=0.75)
 
-        self.log("val/mAP", ap50_95, prog_bar=False)
-        self.log("val/mAP50", ap50, prog_bar=False)
+        self.log("mAP", ap50_95, prog_bar=False)
+        self.log("mAP50", ap50, prog_bar=False)
         if ap50_95 > self.ap50_95:
             self.ap50_95 = ap50_95
         if ap50 > self.ap50:

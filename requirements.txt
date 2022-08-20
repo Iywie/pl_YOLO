@@ -1,12 +1,9 @@
-numpy
 pycocotools
 pytorch_lightning
-PyYAML
 opencv-python
 matplotlib
 torch
 torchvision
 thop
 onnx
-nni
 terminaltables

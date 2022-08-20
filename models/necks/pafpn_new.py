@@ -30,9 +30,6 @@ class NewPAFPN(nn.Module):
         self.shrink_conv4 = BaseConv(in_channels[1], in_channels[0], 1, 1, norm=norm, act=act)
         self.upsample = nn.Upsample(scale_factor=2, mode="bicubic")
 
-        # self.p5_p4 = SwinTransformerLayer(
-        #     in_channels[1], input_resolution=(14, 14), num_heads=1, window_size=7, shift_size=0,
-        # )
         self.p5_p4 = CSPLayer(
             in_channels[1],
             num_bottle=depths[0],
@@ -40,9 +37,6 @@ class NewPAFPN(nn.Module):
             norm=norm,
             act=act,
         )
-        # self.p4_p3 = SwinTransformerLayer(
-        #     in_channels[0], input_resolution=(28, 28), num_heads=1, window_size=7, shift_size=3,
-        # )
 
         self.p4_p3 = CSPLayer(
             in_channels[0],
@@ -55,12 +49,6 @@ class NewPAFPN(nn.Module):
         # bottom-up conv
         self.downsample_conv1 = BaseConv(int(in_channels[0]), int(in_channels[0]), 3, 2, norm=norm, act=act)
         self.downsample_conv2 = BaseConv(int(in_channels[1]), int(in_channels[1]), 3, 2, norm=norm, act=act)
-        # self.n3_n4 = SwinTransformerLayer(
-        #     in_channels[1], input_resolution=(14, 14), num_heads=1, window_size=7, shift_size=0,
-        # )
-        # self.n4_n5 = SwinTransformerLayer(
-        #     in_channels[2], input_resolution=(7, 7), num_heads=1, window_size=7, shift_size=0,
-        # )
 
         self.n3_n4 = CSPLayer(
             in_channels[1],

@@ -1,0 +1,38 @@
+# Parameters
+datamodule: 'neu_coco'
+
+dataset:
+    dir: 'F:\Code\Datasets\Images\Detection\NEU_DET\COCO'
+    num_classes: 6
+    train: 'train'  # directory name of training image
+    train_json: 'annotations/train.json'
+    val: 'val'
+    val_json: 'annotations/val.json'
+    test: 'test'
+    test_json: 'annotations/test.json'
+    train_size: [224,224]  # [224,224] [416,416] [640,640]
+    val_size: [224,224]
+    train_batch_size: 32
+    val_batch_size: 32
+
+transform:
+    # Train transform
+    hsv_prob: 0.5
+    flip_prob: 0.5
+    # Mosaic transform
+    mosaic_prob: 0.9
+    mosaic_scale: [ 0.1, 2.0 ]
+    # Affine transform after mosaic
+    degrees: 0
+    translate: 0.1
+    shear: 2.0
+    perspective: 0.0
+    # CopyPaste in mosaic
+    copypaste_prob: 0
+    copypaste_scale: [ 0.5, 1.5 ]
+    # CutPaste in mosaic
+    cutpaste_prob: 0
+    # Cutout rounding background
+    cutoutR_prob: 0
+
+classes: [crazing, inclusion, patches, pitted_surface, rolled-in_scale, scratches]
