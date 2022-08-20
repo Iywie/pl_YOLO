@@ -1,8 +1,10 @@
 import torch.nn as nn
 # backbones
 from models.backbones.darknet_csp import CSPDarkNet
+from models.backbones.mobilenext_csp import CSPMobileNext
 # necks
 from models.necks.pafpn_csp import CSPPAFPN
+from models.necks.pafpn_al import AL_PAFPN
 # heads
 from models.heads.yolox.decoupled_head import DecoupledHead
 # loss
@@ -19,10 +21,12 @@ def build_model(cfg_models):
 
     backbones = {
         'cspdarknet': CSPDarkNet(cb['depths'], cb['channels'], cb['outputs'], cb['norm'], cb['act']),
+        'cspmobilenext': CSPMobileNext(cb['depths'], cb['channels'], cb['outputs'], cb['norm'], cb['act']),
     }
 
     necks = {
         'csppafpn': CSPPAFPN(cn['depths'], cn['channels'], cn['norm'], cn['act']),
+        'al_pafpn': AL_PAFPN(cn['depths'], cn['channels'], cn['norm'], cn['act']),
     }
 
     heads = {

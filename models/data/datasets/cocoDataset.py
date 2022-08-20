@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 from models.data.datasets.pycocotools.coco import COCO
 from torch.utils.data.dataset import Dataset
-from models.data.augmentation.background import getBackground
 from models.utils.bbox import x1y1wh2xyxy
 
 
@@ -38,14 +37,9 @@ class COCODataset(Dataset):
         self.class_ids = sorted(self.coco.getCatIds())
         self.annotations = self._load_coco_annotations()
         self.gt_bboxes = self._get_gtbbox()
-
         self.imgs = None
         if cache:
             self._cache_images()
-
-        # Background imgs and blocks
-        # self.back_blocks, self.back_cls, self.object_cls = getBackground(
-        #     self.imgs, self.annotations, self.class_ids)
 
     def __len__(self):
         return len(self.ids)
@@ -177,13 +171,3 @@ class COCODataset(Dataset):
             cls = self.class_ids.index(obj["category_id"])
             gtbbox_list[cls] = np.append(gtbbox_list[cls], bbox[np.newaxis, :], axis=0)
         return gtbbox_list
-
-        # # a = np.zeros(shape=(120, 5))
-        # for i in range(len(annotation)):
-        # #     obj = annotation[i]
-        # #     bbox = obj['bbox'].copy()
-        # #     bbox = x1y1wh2xyxy(np.array(bbox))
-        # #     cls = self.class_ids.index(obj["category_id"])
-        # #     bbox = np.append(bbox, cls)
-        # #     a[i] = bbox
-        # # return {'bboxes': a, 'image_id': id_}

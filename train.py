@@ -18,7 +18,7 @@ def main():
     model = build_model(model_cfgs)
     lightning = LitDetection(model, model_cfgs, data_cfgs)
 
-    logger = build_logger(args.logger, model, model_cfgs, args.version)
+    logger = build_logger(args.logger, args.name, model, model_cfgs)
 
     seed_everything(96, workers=True)
 

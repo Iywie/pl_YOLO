@@ -1,5 +1,5 @@
 """
-CSPDarkNet
+CSPMobileNext
 Depths and Channels
     DarkNet-tiny   (1, 3, 3, 1)     (24, 48, 96, 192, 384)
     DarkNet-small  (2, 6, 6, 2)     (32, 64, 128, 256, 512)
@@ -8,18 +8,13 @@ Depths and Channels
 """
 import torch
 from torch import nn
-from torchvision.ops import deform_conv2d
 from models.layers.network_blocks import Focus, BaseConv, SPPBottleneck
 from models.layers.activation import get_activation
-from models.layers.normalization import get_normalization
-from models.layers.attention import SELayer, SALayer, SKFF, ECALayer, GAMLayer, ChannelAttention, \
-    MultiSpectralAttentionLayer, SimAM
-from models.layers.swin_transformer import SwinTransformerLayer
 
 
-class NewCSPDarkNet2(nn.Module):
+class CSPMobileNext(nn.Module):
     """
-    CSPDarkNet consists of five block: stem, dark2, dark3, dark4 and dark5.
+    Self-made backbone: MobileNext + CSPNet + Inverted bottleneck + less activation function
     """
 
     def __init__(
@@ -33,7 +28,7 @@ class NewCSPDarkNet2(nn.Module):
         super().__init__()
 
         # parameters of the network
-        assert out_features, "please provide output features of Darknet!"
+        assert out_features, "please provide output features of CSPMobileNext!"
         self.out_features = out_features
 
         # stem
@@ -138,7 +133,6 @@ class CSPLayer(nn.Module):
 
 
 class Bottleneck(nn.Module):
-    # Standard bottleneck from ResNet
     def __init__(
             self,
             in_channels,

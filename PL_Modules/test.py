@@ -6,10 +6,10 @@ from pytorch_lightning import LightningModule
 from models.detectors.OneStage import OneStageD
 
 # Backbones
-from models.backbones.darknet_new2 import NewCSPDarkNet2
+from models.backbones.mobilenext_csp import NewCSPDarkNet2
 
 # Necks
-from models.necks.pafpn_new import NewPAFPN
+from models.necks.pafpn_al import NewPAFPN
 
 # Heads
 from models.heads.yolox.decoupled_head import DecoupledHead
