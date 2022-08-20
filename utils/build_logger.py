@@ -1,13 +1,12 @@
 import os
 import time
-from pytorch_lightning.loggers import NeptuneLogger, CSVLogger, TensorBoardLogger
+from pytorch_lightning.loggers import NeptuneLogger, CSVLogger, TensorBoardLogger, WandbLogger
 
 
 def build_logger(logger, name, model, configs):
 
     timestamp = time.strftime('%Y%m%d_%H%M', time.localtime())
-    log_dir = os.path.join('./log', f'{timestamp+name}')
-    os.mkdir(r'C:\Users\xf\Desktop\测试文件夹\测试文件夹2')
+    save_dir = os.path.join('./log', f'{timestamp+name}')
 
     if logger == "nep":
         neptune_logger = NeptuneLogger(
@@ -21,17 +20,18 @@ def build_logger(logger, name, model, configs):
         neptune_logger.log_hyperparams(params=configs)
         neptune_logger.log_model_summary(model=model, max_depth=-1)
         return neptune_logger
+
     if logger == 'csv':
-        csv_logger = CSVLogger(save_dir='logs', name="csvlogger", version=name)
+        csv_logger = CSVLogger(save_dir=save_dir, name="csvlogger", version=timestamp)
         csv_logger.log_hyperparams(params=configs)
         return csv_logger
-    if logger == 'tb':
-        tensorboard = TensorBoardLogger(save_dir='logs', name="tensorboardlogger", version=name)
-        tensorboard.log_hyperparams(params=configs)
-        return tensorboard
+
+    if logger == 'wdb':
+        wandb_logger = WandbLogger(project="detection", log_model="all")
+        return wandb_logger
 
     # Default: tensorboard
     else:
-        tensorboard = TensorBoardLogger(save_dir='logs', name="tensorboardlogger", version=version)
+        tensorboard = TensorBoardLogger(save_dir='logs', name=name, version=timestamp)
         tensorboard.log_hyperparams(params=configs)
         return tensorboard

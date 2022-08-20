@@ -23,9 +23,8 @@ def main():
     seed_everything(96, workers=True)
 
     checkpoint_callback = ModelCheckpoint(
-        save_top_k=5,
+        save_top_k=2,
         monitor='mAP',
-        dirpath='logs/',
         mode="max",
         filename='{epoch:02d}-{mAP:.2f}'
     )
@@ -51,7 +50,7 @@ def main():
         # reload_dataloaders_every_n_epochs=10,
     )
 
-    trainer.fit(lightning, datamodule=data, ckpt_path='logs/epoch=29-mAP=0.22.ckpt')
+    trainer.fit(lightning, datamodule=data)
     # trainer.tune(lightning, datamodule=data)
     # trainer.validate(lightning, datamodule=data, ckpt_path='')
     # trainer.test(lightning, datamodule=data)

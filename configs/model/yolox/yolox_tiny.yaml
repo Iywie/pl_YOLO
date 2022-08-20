@@ -1,5 +1,3 @@
-model: 'yolox'
-
 backbone:
     name: cspdarknet
     depths: [1,3,3,1]
