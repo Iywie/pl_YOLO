@@ -8,6 +8,15 @@ def build_logger(logger, name, model, configs):
     timestamp = time.strftime('%Y%m%d_%H%M', time.localtime())
     save_dir = os.path.join('./log', f'{timestamp+name}')
 
+    if logger == 'csv':
+        csv_logger = CSVLogger(save_dir=save_dir, name="csvlogger", version=timestamp)
+        csv_logger.log_hyperparams(params=configs)
+        return csv_logger
+
+    if logger == 'wdb':
+        wandb_logger = WandbLogger(project="detection", log_model="all", save_dir="logs", name=name)
+        return wandb_logger
+
     if logger == "nep":
         neptune_logger = NeptuneLogger(
             project="chihaya/YOLO-Series",
@@ -20,15 +29,6 @@ def build_logger(logger, name, model, configs):
         neptune_logger.log_hyperparams(params=configs)
         neptune_logger.log_model_summary(model=model, max_depth=-1)
         return neptune_logger
-
-    if logger == 'csv':
-        csv_logger = CSVLogger(save_dir=save_dir, name="csvlogger", version=timestamp)
-        csv_logger.log_hyperparams(params=configs)
-        return csv_logger
-
-    if logger == 'wdb':
-        wandb_logger = WandbLogger(project="detection", log_model="all")
-        return wandb_logger
 
     # Default: tensorboard
     else:

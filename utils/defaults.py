@@ -5,9 +5,9 @@ import argparse
 
 def train_argument_parser():
     parser = argparse.ArgumentParser("Joseph's PL_Modules")
+    parser.add_argument("-n", "--experiment_name", default='test', type=str)
     parser.add_argument("-c", "--model", type=str, help='model.yaml path')
     parser.add_argument("-d", "--dataset", type=str, help='dataset.yaml path')
-    parser.add_argument("-n", "--experiment-name", default=None, type=str)
     parser.add_argument("-l", "--logger", type=str, default='', help='model.yaml path')
     parser.add_argument("--data_path", type=str, default=None, help='dataset path reset')
     parser.add_argument("--ckpt", default=None, type=str, help="checkpoint file")

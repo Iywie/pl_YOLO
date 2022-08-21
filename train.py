@@ -18,7 +18,7 @@ def main():
     model = build_model(model_cfgs)
     lightning = LitDetection(model, model_cfgs, data_cfgs)
 
-    logger = build_logger(args.logger, args.name, model, model_cfgs)
+    logger = build_logger(args.logger, args.experiment_name, model, model_cfgs)
 
     seed_everything(96, workers=True)
 
@@ -26,7 +26,7 @@ def main():
         save_top_k=2,
         monitor='mAP',
         mode="max",
-        filename='{epoch:02d}-{mAP:.2f}'
+        filename='{epoch:02d}-{mAP:.2f}',
     )
 
     trainer = Trainer(
