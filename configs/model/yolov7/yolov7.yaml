@@ -1,0 +1,40 @@
+backbone:
+    name: eelan
+    depths: [4,4,4,4]
+    channels: [64,128,256,512,1024] # five blocks
+    outputs: [ "stage2", "stage3", "stage4" ]
+    norm: bn
+    act: silu
+
+neck:
+    name: yolov7neck
+    depths: [4,4,4,4]
+    channels: [512, 1024, 1024]
+    norm: bn
+    act: silu
+
+head:
+    name: implicit_head
+    num_class: 6
+    num_anchor: 3
+    channels: [256, 512, 1024]
+    norm: bn
+    act: silu
+
+loss:
+    name: yolov7
+    num_class: 6
+    stride: [8,16,32]
+    anchors:
+        - [ [ 12,16 ], [ 19,36 ], [ 40,28 ] ]  # P3/8
+        - [ [ 36,75 ], [ 76,55 ], [ 72,146 ] ]  # P4/16
+        - [ [ 142,110 ], [ 192,243 ], [ 459,401 ] ]  # P5/32
+
+optimizer:
+    name: "SGD"
+    learning_rate: 0.03
+    momentum: 0.9
+    weight_decay: 0.0005
+    lr_scheduler: "CosineWarmupScheduler"
+    warmup: 0.1
+    ema: True

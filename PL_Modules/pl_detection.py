@@ -62,7 +62,7 @@ class LitDetection(LightningModule):
         else:
             model = self.model
         start_time = time.time()
-        detections = model(imgs)
+        detections = model(imgs, labels)
         self.infr_times.append(time.time() - start_time)
         start_time = time.time()
         detections = postprocess(detections, self.confidence_threshold, self.nms_threshold)

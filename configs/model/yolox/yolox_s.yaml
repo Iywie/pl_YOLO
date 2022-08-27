@@ -16,13 +16,13 @@ neck:
 head:
     name: decoupled_head
     num_class: 6
-    stride: [8,16,32]
     num_anchor: 1
     norm: bn
     act: silu
 
 loss:
     name: simOTA
+    stride: [8,16,32]
 
 optimizer:
     name: "SGD"

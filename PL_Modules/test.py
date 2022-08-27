@@ -12,11 +12,11 @@ from models.backbones.mobilenext_csp import NewCSPDarkNet2
 from models.necks.pafpn_al import NewPAFPN
 
 # Heads
-from models.heads.yolox.decoupled_head import DecoupledHead
+from models.heads.decoupled_head import DecoupledHead
 
 # Losses
-from models.heads.yolox.yolox_loss import YOLOXLoss
-from models.heads.yolox.yolox_decoder import YOLOXDecoder
+from models.losses.yolox.yolox_loss import YOLOXLoss
+from models.losses.yolox.yolox_decoder import YOLOXDecoder
 
 from models.evaluators.postprocess import postprocess, format_outputs
 from models.evaluators.eval_coco import COCOEvaluator

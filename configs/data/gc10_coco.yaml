@@ -1,4 +1,5 @@
 # Parameters
+name: GC10
 datamodule: 'coco'
 
 dataset:

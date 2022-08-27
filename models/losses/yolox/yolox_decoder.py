@@ -14,6 +14,7 @@ class YOLOXDecoder:
         self.grids = [torch.zeros(1)] * len(strides)
 
     def __call__(self, inputs):
+
         with torch.no_grad():
             preds = []
             batch_size = inputs[0].shape[0]

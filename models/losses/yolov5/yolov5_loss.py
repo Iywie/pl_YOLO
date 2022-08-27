@@ -24,7 +24,7 @@ class YOLOv5Loss:
 
     def __call__(self, inputs, targets):
         """
-        :param inputs: a list of feature maps
+        :param inputs: a list of prediction grids
         :param targets: (bs, max_label, 5)
         :return:
         """

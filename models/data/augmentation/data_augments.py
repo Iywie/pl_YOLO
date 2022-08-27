@@ -47,62 +47,6 @@ class TrainTransform:
         return image_process, padded_labels
 
 
-# class TrainTransform:
-#     def __init__(self, max_labels=50, flip_prob=0.5, hsv_prob=1.0, cutout_prob=0):
-#         self.max_labels = max_labels
-#         self.flip_prob = flip_prob
-#         self.hsv_prob = hsv_prob
-#         self.cutout_prob = cutout_prob
-#
-#     def __call__(self, image, targets, input_dim):
-#         boxes = targets[:, :4].copy()
-#         labels = targets[:, 4].copy()
-#         if len(boxes) == 0:
-#             targets = np.zeros((self.max_labels, 5), dtype=np.float32)
-#             image, r_o = preproc(image, input_dim)
-#             return image, targets
-#
-#         image_t = image.copy()
-#         targets_t = targets.copy()
-#         height_o, width_o, _ = image.shape
-#         boxes_o = targets[:, :4]
-#         labels_o = targets[:, 4]
-#         # bbox_o: [xyxy] to [c_x,c_y,w,h]
-#         boxes_o = xyxy2cxcywh(boxes_o)
-#
-#         if random.random() < self.hsv_prob:
-#             augment_hsv(image)
-#         if random.random() < self.flip_prob:
-#             image_t, boxes = _mirror(image_t, boxes)
-#         if random.random() < self.cutout_prob:
-#             image_t, boxes = cutout(image_t, boxes)
-#
-#         image_t, r = preproc(image_t, input_dim)
-#         # boxes [xyxy] 2 [cx,cy,w,h]
-#         boxes = xyxy2cxcywh(boxes)
-#         boxes *= r
-#
-#         mask_b = np.minimum(boxes[:, 2], boxes[:, 3]) > 1
-#         boxes_t = boxes[mask_b]
-#         labels_t = labels[mask_b]
-#
-#         if len(boxes_t) == 0:
-#             image_t, r_o = preproc(image, input_dim)
-#             boxes_o *= r_o
-#             boxes_t = boxes_o
-#             labels_t = labels_o
-#
-#         labels_t = np.expand_dims(labels_t, 1)
-#
-#         targets_t = np.hstack((labels_t, boxes_t))
-#         padded_labels = np.zeros((self.max_labels, 5))
-#         padded_labels[range(len(targets_t))[: self.max_labels]] = targets_t[
-#                                                                   : self.max_labels
-#                                                                   ]
-#         padded_labels = np.ascontiguousarray(padded_labels, dtype=np.float32)
-#         return image_t, padded_labels
-
-
 class ValTransform:
     """
     Defines the transformations that should be applied to test PIL image

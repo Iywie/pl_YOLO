@@ -153,3 +153,23 @@ class SPPBottleneck(nn.Module):
         x = torch.cat([x] + [m(x) for m in self.m], dim=1)
         x = self.conv2(x)
         return x
+
+
+class SPPCSPC(nn.Module):
+    # CSP https://github.com/WongKinYiu/CrossStagePartialNetworks
+    def __init__(self, c1, c2, k=(5, 9, 13)):
+        super(SPPCSPC, self).__init__()
+        self.cv1 = BaseConv(c1, c2, 1, 1)
+        self.cv2 = BaseConv(c1, c2, 1, 1)
+        self.cv3 = BaseConv(c2, c2, 3, 1)
+        self.cv4 = BaseConv(c2, c2, 1, 1)
+        self.m = nn.ModuleList([nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k])
+        self.cv5 = BaseConv(4 * c2, c2, 1, 1)
+        self.cv6 = BaseConv(c2, c2, 3, 1)
+        self.cv7 = BaseConv(2 * c2, c2, 1, 1)
+
+    def forward(self, x):
+        x1 = self.cv4(self.cv3(self.cv1(x)))
+        y1 = self.cv6(self.cv5(torch.cat([x1] + [m(x1) for m in self.m], 1)))
+        y2 = self.cv2(x)
+        return self.cv7(torch.cat((y1, y2), dim=1))

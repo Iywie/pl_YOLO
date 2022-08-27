@@ -3,7 +3,7 @@ import time
 from pytorch_lightning.loggers import NeptuneLogger, CSVLogger, TensorBoardLogger, WandbLogger
 
 
-def build_logger(logger, name, model, configs):
+def build_logger(logger, project_name, name, model, configs):
 
     timestamp = time.strftime('%Y%m%d_%H%M', time.localtime())
     save_dir = os.path.join('./log', f'{timestamp+name}')
@@ -14,7 +14,7 @@ def build_logger(logger, name, model, configs):
         return csv_logger
 
     if logger == 'wdb':
-        wandb_logger = WandbLogger(project="detection", log_model="all", save_dir="logs", name=name)
+        wandb_logger = WandbLogger(project=project_name, log_model="all", save_dir="logs")
         return wandb_logger
 
     if logger == "nep":

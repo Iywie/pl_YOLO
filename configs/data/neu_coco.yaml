@@ -1,5 +1,6 @@
 # Parameters
-datamodule: 'neu_coco'
+name: NEU-DET
+datamodule: 'coco'
 
 dataset:
     dir: 'F:\Code\Datasets\Images\Detection\NEU_DET\COCO'
@@ -12,8 +13,8 @@ dataset:
     test_json: 'annotations/test.json'
     train_size: [224,224]  # [224,224] [416,416] [640,640]
     val_size: [224,224]
-    train_batch_size: 32
-    val_batch_size: 32
+    train_batch_size: 16
+    val_batch_size: 16
 
 transform:
     # Train transform

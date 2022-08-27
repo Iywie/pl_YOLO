@@ -49,7 +49,7 @@ class COCODataModule(pl.LightningDataModule):
             json=self.train_json_path,
             img_size=self.img_size_train,
             preprocess=TrainTransform(max_labels=50, flip_prob=self.flip_prob, hsv_prob=self.hsv_prob),
-            cache=True,
+            cache=False,
         )
         self.dataset_train = MosaicDetection(
             self.dataset_train,
@@ -69,9 +69,11 @@ class COCODataModule(pl.LightningDataModule):
             cutpaste_prob=self.cutpaste_prob,
             cutoutR_prob=self.cutoutR_prob
         )
-        sampler = RandomSampler(self.dataset_train)
-        batch_sampler = BatchSampler(sampler, batch_size=self.train_batch_size, drop_last=False)
-        train_loader = DataLoader(self.dataset_train, batch_sampler=batch_sampler,
+        # sampler = RandomSampler(self.dataset_train)
+        # batch_sampler = BatchSampler(sampler, batch_size=self.train_batch_size, drop_last=False)
+        # train_loader = DataLoader(self.dataset_train, batch_sampler=batch_sampler,
+        #                           num_workers=6, pin_memory=True, persistent_workers=True)
+        train_loader = DataLoader(self.dataset_train, batch_size=self.train_batch_size, shuffle=True,
                                   num_workers=6, pin_memory=True, persistent_workers=True)
         return train_loader
 
@@ -82,9 +84,11 @@ class COCODataModule(pl.LightningDataModule):
             json=self.val_json_path,
             img_size=self.img_size_val,
             preprocess=ValTransform(legacy=False),
-            cache=True,
+            cache=False,
         )
-        sampler = torch.utils.data.SequentialSampler(self.dataset_val)
-        val_loader = DataLoader(self.dataset_val, batch_size=self.val_batch_size, sampler=sampler,
-                                num_workers=6, pin_memory=True, shuffle=False, persistent_workers=True)
+        # sampler = torch.utils.data.SequentialSampler(self.dataset_val)
+        # val_loader = DataLoader(self.dataset_val, batch_size=self.val_batch_size, sampler=sampler,
+        #                         num_workers=6, pin_memory=True, shuffle=False, persistent_workers=True)
+        val_loader = DataLoader(self.dataset_val, batch_size=self.val_batch_size, shuffle=False,
+                                num_workers=6, pin_memory=True, persistent_workers=True)
         return val_loader
