@@ -23,6 +23,8 @@ class YOLOXLoss(nn.Module):
 
         # inference
         if not self.training:
+            preds[..., 4] = preds[..., 4].sigmoid()
+            preds[..., 5:] = preds[..., 5:].sigmoid()
             # from (cx,cy,w,h) to (x1,y1,x2,y2)
             box_corner = preds.new(preds.shape)
             box_corner = box_corner[:, :, 0:4]
