@@ -1,7 +1,7 @@
 model: 'yolox'
 
 backbone:
-    name: cspmobilenext
+    name: newnet
     depths: [3,9,9,3]
     channels: [32,64,128,256,512] # five blocks
     outputs: [ "stage2", "stage3", "stage4" ]

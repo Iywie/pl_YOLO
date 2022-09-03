@@ -1,32 +1,34 @@
-model: 'yolox'
-
 backbone:
-    name: cspmobilenext
-    depths: [3,9,9,3]
+    name: eelan
+    depths: [2,2,2,2]
     channels: [32,64,128,256,512] # five blocks
     outputs: [ "stage2", "stage3", "stage4" ]
     norm: bn
-    act: silu
+    act: lrelu
 
 neck:
-    name: al_pafpn
-    depths: [1,1,1,1]
-    channels: [128, 256, 512]
+    name: yolov7neck
+    depths: [2,2,2,2]
+    channels: [256, 512, 512]
     norm: bn
-    act: silu
+    act: lrelu
 
 head:
-    name: decoupled_head
+    name: implicit_head
     num_class: 6
-    num_anchor: 1
+    num_anchor: 3
     channels: [128, 256, 512]
     norm: bn
-    act: silu
+    act: lrelu
 
 loss:
-    name: yolox
+    name: yolov7
     num_class: 6
     stride: [8,16,32]
+    anchors:
+        - [ [ 98,37 ], [ 624,16 ], [ 316,41 ] ]  # P3/8
+        - [ [ 642,29 ], [ 640,43 ], [ 639,84 ] ]  # P4/16
+        - [ [ 634,114 ], [ 639,153 ], [ 644,217 ] ]  # P5/32
 
 optimizer:
     name: "SGD"

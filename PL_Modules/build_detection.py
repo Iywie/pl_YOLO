@@ -3,6 +3,7 @@ import torch.nn as nn
 from models.backbones.darknet_csp import CSPDarkNet
 from models.backbones.mobilenext_csp import CSPMobileNext
 from models.backbones.eelan import EELAN
+from models.backbones.darknet_new import NewNet
 # necks
 from models.necks.pafpn_csp import CSPPAFPN
 from models.necks.pafpn_al import AL_PAFPN
@@ -60,6 +61,11 @@ def cspmobilenext(cfg):
 
 def eelan(cfg):
     backbone = EELAN(cfg['depths'], cfg['channels'], cfg['outputs'], cfg['norm'], cfg['act'])
+    return backbone
+
+
+def newnet(cfg):
+    backbone = NewNet(cfg['depths'], cfg['channels'], cfg['outputs'], cfg['norm'], cfg['act'])
     return backbone
 
 
