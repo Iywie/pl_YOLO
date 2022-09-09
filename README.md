@@ -5,5 +5,5 @@ Detection on pytorch lightning.
 ### 1. Build the model configuration and data configuratioin in configs.
 ### 2. Run
 ```python
-  python train.py -c <absolute path to the model config> -d <absolute path to the data config>
+  python train.py -c <path to the model config> -d <path to the data config>
 ```
