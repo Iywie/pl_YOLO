@@ -15,7 +15,7 @@ from torch.nn import init
 class MobileNetV3_Small(nn.Module):
     def __init__(
             self,
-            out_features=("stage2", "stage3", "stage4")
+            out_features=("stage2", "stage3", "stage4"),
     ):
         super(MobileNetV3_Small, self).__init__()
 

@@ -1,6 +1,6 @@
 import torch
 from utils.defaults import train_argument_parser, load_config
-from utils.build_model import build_model
+from PL_Modules.build_detection import build_model
 
 
 def main():

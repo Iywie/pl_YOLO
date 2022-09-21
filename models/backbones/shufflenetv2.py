@@ -20,7 +20,9 @@ class ShuffleNetV2_Plus(nn.Module):
     def __init__(
             self,
             channels=(36, 104, 208, 416),
-            out_features=("stage2", "stage3", "stage4")
+            out_features=("stage2", "stage3", "stage4"),
+            norm='bn',
+            act="silu",
     ):
         super(ShuffleNetV2_Plus, self).__init__()
         self.out_features = out_features
@@ -28,7 +30,6 @@ class ShuffleNetV2_Plus(nn.Module):
         # building first layer
         self.stem = BaseConv(3, 16, 3, 2, norm="bn", act="hswish")
 
-        act = "relu"
         useSE = False
         self.stage1 = nn.Sequential(
             Shufflenet(16, channels[0], ksize=3, stride=2, activation=act, useSE=useSE),

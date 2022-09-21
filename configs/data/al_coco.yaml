@@ -13,8 +13,8 @@ dataset:
     test_json: 'annotations/test.json'
     train_size: [640,640]  # [224,224] [416,416] [640,640]
     val_size: [640,640]
-    train_batch_size: 16
-    val_batch_size: 16
+    train_batch_size: 2
+    val_batch_size: 1
 
 transform:
     # Train transform
@@ -34,6 +34,6 @@ transform:
     # CutPaste in mosaic
     cutpaste_prob: 0
     # Cutout rounding background
-    cutoutR_prob: 0.5
+    cutoutR_prob: 0
 
 classes: [bdd, jwld, jp, ld, qk, zs]  # [不导电, 角位漏底, 桔皮, 漏底, 起坑, 杂色]

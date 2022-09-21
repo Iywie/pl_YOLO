@@ -111,14 +111,19 @@ class CSPLayer(nn.Module):
             act (str): type of activation
         """
         super().__init__()
-        bottle_attn = None
-        in_ch = in_channels // 2
-        hidden_channels = int(in_ch * expansion)  # hidden channels
+        in_ch = in_channels // 4
+        num_conv = num_bottle // 2 if num_bottle > 2 else 1
+
         self.conv1 = BaseConv(in_channels, in_ch, 1, stride=1, norm=norm, act=act)
         self.conv2 = BaseConv(in_channels, in_ch, 1, stride=1, norm=norm, act=act)
-        self.m = nn.Sequential(
-            *[Bottleneck(in_ch, in_ch, 1, shortcut, 2, norm=norm, act=act, attn=bottle_attn)
-              for _ in range(num_bottle - 1)]
+
+        self.conv3 = nn.Sequential(
+            *[Bottleneck(in_ch, in_ch, stride=1, shortcut=True, expansion=2, norm=norm, act=act)
+              for _ in range(num_conv)]
+        )
+        self.conv4 = nn.Sequential(
+            *[Bottleneck(in_ch, in_ch, stride=1, shortcut=True, expansion=2, norm=norm, act=act)
+              for _ in range(num_conv)]
         )
         self.nonlinearity = get_activation(act)
         self.use_attn = False
@@ -129,16 +134,14 @@ class CSPLayer(nn.Module):
     def forward(self, x):
         x_1 = self.conv1(x)
         x_2 = self.conv2(x)
-        x_1 = self.m(x_1)
-        x = torch.cat((x_2, x_1), dim=1)
-        if self.use_attn is True:
-            x = self.attn(x)
-        x = self.nonlinearity(x)
+        x_3 = self.conv3(x_2)
+        x_4 = self.conv4(x_3)
+        x_all = [x_1, x_2, x_3, x_4]
+        x = torch.cat(x_all, dim=1)
         return x
 
 
 class Bottleneck(nn.Module):
-    # Standard bottleneck from ResNet
     def __init__(
             self,
             in_channels,

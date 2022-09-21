@@ -14,7 +14,7 @@ def build_logger(logger, project_name, name, model, configs):
         return csv_logger
 
     if logger == 'wdb':
-        wandb_logger = WandbLogger(project=project_name, log_model="all", save_dir="logs")
+        wandb_logger = WandbLogger(project=project_name, save_dir="log", version=name)
         return wandb_logger
 
     if logger == "nep":

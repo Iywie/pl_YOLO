@@ -6,6 +6,7 @@ from models.utils.ema import ModelEMA
 from torch.optim import SGD
 from models.layers.lr_scheduler import CosineWarmupScheduler
 # Evaluate
+from utils.flops import model_summary
 from models.evaluators.postprocess import postprocess, format_outputs
 from models.evaluators.eval_coco import COCOEvaluator
 from models.evaluators.eval_voc import VOCEvaluator
@@ -38,7 +39,7 @@ class LitDetection(LightningModule):
     def on_train_start(self) -> None:
         if self.ema is True:
             self.ema_model = ModelEMA(self.model, 0.9998)
-        # model_summary(self.model, self.img_size_train, self.device)
+        model_summary(self.model, self.img_size_train, self.device)
 
     def training_step(self, batch, batch_idx):
         imgs, labels, _, _, _ = batch

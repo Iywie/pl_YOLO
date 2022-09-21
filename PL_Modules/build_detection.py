@@ -3,7 +3,9 @@ import torch.nn as nn
 from models.backbones.darknet_csp import CSPDarkNet
 from models.backbones.mobilenext_csp import CSPMobileNext
 from models.backbones.eelan import EELAN
-from models.backbones.darknet_new import NewNet
+from models.backbones.ecmnet import ECMNet
+from models.backbones.shufflenetv2 import ShuffleNetV2_Plus
+from models.backbones.mobilenetv3 import MobileNetV3_Small, MobileNetV3_Large
 # necks
 from models.necks.pafpn_csp import CSPPAFPN
 from models.necks.pafpn_al import AL_PAFPN
@@ -39,13 +41,14 @@ class OneStageD(nn.Module):
         self.head = head
         self.loss = loss
 
-    def forward(self, x, labels):
+    def forward(self, x, labels=None):
         x = self.backbone(x)
         if self.neck is not None:
             x = self.neck(x)
         x = self.head(x)
-        output = self.loss(x, labels)
-        return output
+        if labels is not None:
+            x = self.loss(x, labels)
+        return x
 
 
 # Backbones
@@ -64,8 +67,23 @@ def eelan(cfg):
     return backbone
 
 
-def newnet(cfg):
-    backbone = NewNet(cfg['depths'], cfg['channels'], cfg['outputs'], cfg['norm'], cfg['act'])
+def ecmnet(cfg):
+    backbone = ECMNet(cfg['depths'], cfg['channels'], cfg['outputs'], cfg['norm'], cfg['act'])
+    return backbone
+
+
+def shufflenetv2(cfg):
+    backbone = ShuffleNetV2_Plus(cfg['channels'], cfg['outputs'], cfg['norm'], cfg['act'])
+    return backbone
+
+
+def mobilenetv3s(cfg):
+    backbone = MobileNetV3_Small(cfg['outputs'])
+    return backbone
+
+
+def mobilenetv3l(cfg):
+    backbone = MobileNetV3_Large(cfg['outputs'])
     return backbone
 
 
@@ -83,6 +101,10 @@ def al_pafpn(cfg):
 def yolov7neck(cfg):
     neck = YOLOv7NECK(cfg['depths'], cfg['channels'], cfg['norm'], cfg['act'])
     return neck
+
+
+def none(cfg):
+    return None
 
 
 # Heads

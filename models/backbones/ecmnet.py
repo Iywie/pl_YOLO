@@ -12,7 +12,7 @@ from models.layers.network_blocks import Focus, BaseConv, SPPBottleneck
 from models.layers.activation import get_activation
 
 
-class NewNet(nn.Module):
+class ECMNet(nn.Module):
     """
     Self-made backbone: MobileNext + CSPNet + Inverted bottleneck + less activation function
     """
@@ -106,21 +106,20 @@ class CSPLayer(nn.Module):
             act (str): type of activation
         """
         super().__init__()
-        in_ch = in_channels // 2
-        num_conv1 = (num_bottle - 1) // 2
-        num_conv2 = num_bottle - 1 - num_conv1
+        in_ch = in_channels // 4
+        num_conv = num_bottle // 2 if num_bottle > 2 else 1
 
         self.conv1 = BaseConv(in_channels, in_ch, 1, stride=1, norm=norm, act=act)
         self.conv2 = BaseConv(in_channels, in_ch, 1, stride=1, norm=norm, act=act)
+
         self.conv3 = nn.Sequential(
-            *[Bottleneck(in_ch, in_ch, 1, shortcut, 2, norm=norm, act=act)
-              for _ in range(num_conv1)]
+            *[Bottleneck(in_ch, in_ch, stride=1, shortcut=True, expansion=2, norm=norm, act=act)
+              for _ in range(num_conv)]
         )
         self.conv4 = nn.Sequential(
-            *[Bottleneck(in_ch, in_ch, 1, shortcut, 2, norm=norm, act=act)
-              for _ in range(num_conv2)]
+            *[Bottleneck(in_ch, in_ch, stride=1, shortcut=True, expansion=2, norm=norm, act=act)
+              for _ in range(num_conv)]
         )
-        self.conv5 = BaseConv(4 * in_ch, in_channels, 1, stride=1, norm=norm, act=act)
         self.nonlinearity = get_activation(act)
         self.use_attn = False
         if attn is not None:
@@ -134,8 +133,7 @@ class CSPLayer(nn.Module):
         x_4 = self.conv4(x_3)
         x_all = [x_1, x_2, x_3, x_4]
         x = torch.cat(x_all, dim=1)
-        x = self.nonlinearity(x)
-        return self.conv5(x)
+        return x
 
 
 class Bottleneck(nn.Module):
