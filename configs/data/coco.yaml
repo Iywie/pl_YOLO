@@ -2,7 +2,7 @@
 datamodule: 'coco'
 
 dataset:
-    dir: 'F:\Code\Datasets\Detection\COCO2017'
+    dir: 'D:\Code\Datasets\Detection\COCO2017'
     num_classes: 80
     train: 'train'  # directory name of training image
     train_json: 'annotations/train.json'

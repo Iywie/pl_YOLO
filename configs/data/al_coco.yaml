@@ -3,7 +3,7 @@ name: Aluminum profile
 datamodule: coco
 
 dataset:
-    dir: 'F:\Code\Datasets\Images\Detection\Aluminium\COCO'
+    dir: 'D:\Code\Datasets\Images\Detection\Aluminium\COCO'
     num_classes: 6
     train: 'train'  # directory name of training image
     train_json: 'annotations/train.json'

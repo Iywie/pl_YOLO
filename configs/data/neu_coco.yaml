@@ -3,7 +3,7 @@ name: NEU-DET
 datamodule: 'coco'
 
 dataset:
-    dir: 'F:\Code\Datasets\Images\Detection\NEU_DET\COCO'
+    dir: 'D:\Code\Datasets\Images\Detection\NEU_DET\NEU_DET_COCO'
     num_classes: 6
     train: 'train'  # directory name of training image
     train_json: 'annotations/train.json'
@@ -13,8 +13,8 @@ dataset:
     test_json: 'annotations/test.json'
     train_size: [224,224]  # [224,224] [416,416] [640,640]
     val_size: [224,224]
-    train_batch_size: 16
-    val_batch_size: 16
+    train_batch_size: 32
+    val_batch_size: 32
 
 transform:
     # Train transform

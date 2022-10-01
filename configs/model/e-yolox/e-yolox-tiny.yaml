@@ -1,0 +1,38 @@
+model: 'yolox'
+
+backbone:
+    name: ecmnet
+    depths: [2,8,8,2]
+    channels: [32,64,128,256,512] # five blocks
+    outputs: [ "stage2", "stage3", "stage4" ]
+    norm: bn
+    act: silu
+
+neck:
+    name: al_pafpn
+    depths: [2,2,2,2]
+    channels: [128,256,512]
+    norm: bn
+    act: silu
+
+head:
+    name: decoupled_head
+    num_class: 6
+    num_anchor: 1
+    channels: [128,256,512]
+    norm: bn
+    act: silu
+
+loss:
+    name: yolox
+    num_class: 6
+    stride: [8,16,32]
+
+optimizer:
+    name: "SGD"
+    learning_rate: 0.03
+    momentum: 0.9
+    weight_decay: 0.0005
+    lr_scheduler: "CosineWarmupScheduler"
+    warmup: 0.1
+    ema: True
