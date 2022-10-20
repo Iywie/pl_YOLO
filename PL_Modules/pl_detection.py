@@ -22,7 +22,7 @@ class LitDetection(LightningModule):
         self.cd = data_cfgs['dataset']
         self.nms_threshold = 0.65
         self.confidence_threshold = 0.01
-        self.num_classes = self.cd['num_classes']
+        self.num_classes = data_cfgs['num_classes']
         self.img_size_train = tuple(self.cd['train_size'])
         self.img_size_val = tuple(self.cd['val_size'])
         # Training

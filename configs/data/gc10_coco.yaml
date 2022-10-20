@@ -3,8 +3,7 @@ name: GC10
 datamodule: 'coco'
 
 dataset:
-    dir: 'F:\Code\Datasets\Detection\GC10\COCO'
-    num_classes: 10
+    dir: 'D:\Code\Datasets\Images\Detection\GC10\COCO'
     train: 'train'  # directory name of training image
     train_json: 'annotations/train.json'
     val: 'val'
@@ -13,7 +12,7 @@ dataset:
     test_json: 'annotations/test.json'
     train_size: [640,640]  # [224,224] [416,416] [640,640]
     val_size: [640,640]
-    train_batch_size: 8
+    train_batch_size: 16
     val_batch_size: 1
 
 transform:
@@ -34,7 +33,8 @@ transform:
     # CutPaste in mosaic
     cutpaste_prob: 0
     # Cutout rounding background
-    cutoutR_prob: 0.5
+    cutoutR_prob: 0
 
+num_classes: 10
 classes: [punching_hole, welding_line, crescent_gap, water_spot, oil_spot,
             silk_spot, inclusion, rolled_pit, crease, waist_folding]

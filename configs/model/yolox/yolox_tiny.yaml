@@ -15,7 +15,7 @@ neck:
 
 head:
     name: decoupled_head
-    num_class: 6
+    num_class: 10
     num_anchor: 1
     channels: [96,192,384]
     norm: bn
@@ -23,7 +23,7 @@ head:
 
 loss:
     name: yolox
-    num_class: 6
+    num_class: 10
     stride: [8,16,32]
 
 optimizer:

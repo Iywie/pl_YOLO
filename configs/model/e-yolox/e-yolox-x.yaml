@@ -1,22 +1,24 @@
+model: 'yolox'
+
 backbone:
-    name: cspdarknet
-    depths: [3,9,9,3]
-    channels: [64,128,256,512,1024] # five blocks
+    name: ecmnet
+    depths: [4,12,12,4]
+    channels: [80,160,320,640,1280] # five blocks
     outputs: [ "stage2", "stage3", "stage4" ]
     norm: bn
     act: silu
 
 neck:
-    name: csppafpn
-    depths: [3,3,3,3]
-    channels: [256,512,1024]
+    name: al_pafpn
+    depths: [4,4,4,4]
+    channels: [320,640,1280]
     norm: bn
     act: silu
 
 head:
     name: decoupled_head
     num_anchor: 1
-    channels: [256,512,1024]
+    channels: [320,640,1280]
     norm: bn
     act: silu
 
@@ -26,7 +28,7 @@ loss:
 
 optimizer:
     name: "SGD"
-    learning_rate: 0.01
+    learning_rate: 0.03
     momentum: 0.9
     weight_decay: 0.0005
     lr_scheduler: "CosineWarmupScheduler"

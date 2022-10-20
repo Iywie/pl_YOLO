@@ -1,5 +1,5 @@
 backbone:
-    name: cspdarknet
+    name: ecmnet
     depths: [3,9,9,3]
     channels: [64,128,256,512,1024] # five blocks
     outputs: [ "stage2", "stage3", "stage4" ]
@@ -7,7 +7,7 @@ backbone:
     act: silu
 
 neck:
-    name: csppafpn
+    name: al_pafpn
     depths: [3,3,3,3]
     channels: [256,512,1024]
     norm: bn
@@ -26,7 +26,7 @@ loss:
 
 optimizer:
     name: "SGD"
-    learning_rate: 0.01
+    learning_rate: 0.03
     momentum: 0.9
     weight_decay: 0.0005
     lr_scheduler: "CosineWarmupScheduler"

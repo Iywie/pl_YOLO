@@ -18,7 +18,7 @@ from models.losses.yolox.yolox_loss import YOLOXLoss
 from models.losses.yolov7.yolov7_loss import YOLOv7Loss
 
 
-def build_model(cfg_models):
+def build_model(cfg_models, num_classes):
     cb = cfg_models['backbone']
     cn = cfg_models['neck']
     ch = cfg_models['head']
@@ -26,8 +26,8 @@ def build_model(cfg_models):
 
     backbone = eval(cb['name'])(cb)
     neck = eval(cn['name'])(cn)
-    head = eval(ch['name'])(ch)
-    loss = eval(cl['name'])(cl)
+    head = eval(ch['name'])(ch, num_classes)
+    loss = eval(cl['name'])(cl, num_classes)
     model = OneStageD(backbone, neck, head, loss)
     return model
 
@@ -108,22 +108,22 @@ def none(cfg):
 
 
 # Heads
-def decoupled_head(cfg):
-    head = DecoupledHead(cfg['num_class'], cfg['num_anchor'], cfg['channels'], cfg['norm'], cfg['act'])
+def decoupled_head(cfg, num_classes):
+    head = DecoupledHead(num_classes, cfg['num_anchor'], cfg['channels'], cfg['norm'], cfg['act'])
     return head
 
 
-def implicit_head(cfg):
-    head = ImplicitHead(cfg['num_class'], cfg['num_anchor'], cfg['channels'])
+def implicit_head(cfg, num_classes):
+    head = ImplicitHead(num_classes, cfg['num_anchor'], cfg['channels'])
     return head
 
 
 # Losses
-def yolox(cfg):
-    head = YOLOXLoss(cfg['num_class'], cfg['stride'])
+def yolox(cfg, num_classes):
+    head = YOLOXLoss(num_classes, cfg['stride'])
     return head
 
 
-def yolov7(cfg):
-    head = YOLOv7Loss(cfg['num_class'], cfg['stride'], cfg['anchors'])
+def yolov7(cfg, num_classes):
+    head = YOLOv7Loss(num_classes, cfg['stride'], cfg['anchors'])
     return head

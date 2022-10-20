@@ -15,7 +15,7 @@ def main():
     data = data(data_cfgs)
 
     model_cfgs = load_config(args.model)
-    model = build_model(model_cfgs)
+    model = build_model(model_cfgs, data_cfgs['num_classes'])
     lightning = LitDetection(model, model_cfgs, data_cfgs)
 
     logger = build_logger(args.logger, data_cfgs['name'], args.experiment_name, model, model_cfgs)
@@ -50,9 +50,9 @@ def main():
         # reload_dataloaders_every_n_epochs=10,
     )
 
-    trainer.fit(lightning, datamodule=data)
+    # trainer.fit(lightning, datamodule=data)
     # trainer.tune(lightning, datamodule=data)
-    # trainer.validate(lightning, datamodule=data, ckpt_path='D:\论文\实验数据\Aluminum\yolov7-tiny\epoch=289-mAP=0.71.ckpt')
+    trainer.validate(lightning, datamodule=data, ckpt_path=r'D:\论文\实验数据\GC10\e-yolox\e-yolox-l-epoch=169-mAP=0.356.ckpt')
     # trainer.test(lightning, datamodule=data)
 
 

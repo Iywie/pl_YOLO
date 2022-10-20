@@ -15,7 +15,6 @@ neck:
 
 head:
     name: decoupled_head
-    num_class: 6
     num_anchor: 1
     channels: [128, 256, 512]
     norm: bn
@@ -23,12 +22,11 @@ head:
 
 loss:
     name: yolox
-    num_class: 6
     stride: [8,16,32]
 
 optimizer:
     name: "SGD"
-    learning_rate: 0.03
+    learning_rate: 0.01
     momentum: 0.9
     weight_decay: 0.0005
     lr_scheduler: "CosineWarmupScheduler"
