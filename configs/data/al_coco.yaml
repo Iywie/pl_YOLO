@@ -3,8 +3,7 @@ name: Aluminum profile
 datamodule: coco
 
 dataset:
-    dir: 'D:\Code\Datasets\Images\Detection\Aluminium\COCO'
-    num_classes: 6
+    dir: '/home/chihaya/Code/AI/Dataset/Aluminum/COCO'
     train: 'train'  # directory name of training image
     train_json: 'annotations/train.json'
     val: 'val'
@@ -13,8 +12,8 @@ dataset:
     test_json: 'annotations/test.json'
     train_size: [640,640]  # [224,224] [416,416] [640,640]
     val_size: [640,640]
-    train_batch_size: 2
-    val_batch_size: 1
+    train_batch_size: 4
+    val_batch_size: 4
 
 transform:
     # Train transform
@@ -36,4 +35,5 @@ transform:
     # Cutout rounding background
     cutoutR_prob: 0
 
+num_classes: 6
 classes: [bdd, jwld, jp, ld, qk, zs]  # [不导电, 角位漏底, 桔皮, 漏底, 起坑, 杂色]

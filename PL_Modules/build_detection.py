@@ -1,4 +1,5 @@
 import torch.nn as nn
+from timm.models import create_model
 # backbones
 from models.backbones.darknet_csp import CSPDarkNet
 from models.backbones.mobilenext_csp import CSPMobileNext
@@ -6,6 +7,8 @@ from models.backbones.eelan import EELAN
 from models.backbones.ecmnet import ECMNet
 from models.backbones.shufflenetv2 import ShuffleNetV2_Plus
 from models.backbones.mobilenetv3 import MobileNetV3_Small, MobileNetV3_Large
+from models.backbones.vision_transformer.vision_transformer import VisionTransformer
+from models.backbones.vision_transformer.swin_transformer import SwinTransformer
 # necks
 from models.necks.pafpn_csp import CSPPAFPN
 from models.necks.pafpn_al import AL_PAFPN
@@ -84,6 +87,19 @@ def mobilenetv3s(cfg):
 
 def mobilenetv3l(cfg):
     backbone = MobileNetV3_Large(cfg['outputs'])
+    return backbone
+
+
+def vision_transformer(cfg):
+    backbone = VisionTransformer(patch_size=cfg['patch_size'], embed_dim=cfg['embed_dim'], depth=cfg['depth'],
+                                 num_heads=cfg['num_heads'], mlp_ratio=cfg['mlp_ratio'])
+    return backbone
+
+
+def swin_transformer(cfg):
+    backbone = SwinTransformer(embed_dim=cfg['embed_dim'], depths=cfg['depths'], num_heads=cfg['num_heads'],
+                               window_size=cfg['window_size'], mlp_ratio=cfg['mlp_ratio'],
+                               drop_path_rate=cfg['drop_path_rate'])
     return backbone
 
 

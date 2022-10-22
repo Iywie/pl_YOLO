@@ -7,3 +7,9 @@ torchvision
 thop
 onnx
 terminaltables
+numpy
+onnxruntime
+tqdm
+pyyaml
+einops
+timm

@@ -14,6 +14,8 @@ def build_logger(logger, project_name, name, model, configs):
         return csv_logger
 
     if logger == 'wdb':
+        if not os.path.exists("./log"):
+            os.mkdir("./log")
         wandb_logger = WandbLogger(project=project_name, save_dir="log", version=name)
         return wandb_logger
 

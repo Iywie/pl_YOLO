@@ -1,31 +1,32 @@
-model: 'yolox'
-
 backbone:
-    name: shufflenetv2
-    channels: [36, 104, 208, 416] # four blocks
-    outputs: [ "stage2", "stage3", "stage4" ]
+    name: vision_transformer
+    patch_size: 16
+    embed_dim: 192
+    depth: 12
+    num_heads: 3
+    mlp_ratio: 4.
+
+neck:
+    name: csppafpn
+    depths: [3,3,3,3]
+    channels: [256,512,1024]
     norm: bn
     act: silu
 
-neck:
-    name: none
-
 head:
     name: decoupled_head
-    num_class: 6
     num_anchor: 1
-    channels: [104, 208, 416]
+    channels: [256,512,1024]
     norm: bn
     act: silu
 
 loss:
     name: yolox
-    num_class: 6
     stride: [8,16,32]
 
 optimizer:
     name: "SGD"
-    learning_rate: 0.03
+    learning_rate: 0.01
     momentum: 0.9
     weight_decay: 0.0005
     lr_scheduler: "CosineWarmupScheduler"

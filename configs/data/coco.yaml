@@ -3,7 +3,6 @@ datamodule: 'coco'
 
 dataset:
     dir: 'D:\Code\Datasets\Detection\COCO2017'
-    num_classes: 80
     train: 'train'  # directory name of training image
     train_json: 'annotations/train.json'
     val: 'val'
@@ -35,6 +34,7 @@ transform:
     # Cutout rounding background
     cutoutR_prob: 0
 
+num_classes: 80
 classes: [person, bicycle, car, motorcycle, airplane,
           bus,train, truck, boat, traffic light,
           fire hydrant, stop sign, parking meter, bench, bird,

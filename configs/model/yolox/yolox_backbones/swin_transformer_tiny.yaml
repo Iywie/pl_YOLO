@@ -1,0 +1,31 @@
+backbone:
+    name: swin_transformer
+    embed_dim: 96
+    depths: [2, 2, 6, 2]
+    num_heads: [3, 6, 12, 24]
+    window_size: 7
+    mlp_ratio: 4.
+    drop_path_rate: 0.2
+
+neck:
+    name: none
+
+head:
+    name: decoupled_head
+    num_anchor: 1
+    channels: [96, 192, 384, 768]
+    norm: bn
+    act: silu
+
+loss:
+    name: yolox
+    stride: [4,8,16,32]
+
+optimizer:
+    name: "SGD"
+    learning_rate: 0.01
+    momentum: 0.9
+    weight_decay: 0.0005
+    lr_scheduler: "CosineWarmupScheduler"
+    warmup: 0.1
+    ema: True

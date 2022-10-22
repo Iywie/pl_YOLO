@@ -50,9 +50,9 @@ def main():
         # reload_dataloaders_every_n_epochs=10,
     )
 
-    # trainer.fit(lightning, datamodule=data)
+    trainer.fit(lightning, datamodule=data)
     # trainer.tune(lightning, datamodule=data)
-    trainer.validate(lightning, datamodule=data, ckpt_path=r'D:\论文\实验数据\GC10\e-yolox\e-yolox-l-epoch=169-mAP=0.356.ckpt')
+    # trainer.validate(lightning, datamodule=data, ckpt_path='weights/al6/epoch=399-mAP=0.774.ckpt')
     # trainer.test(lightning, datamodule=data)
 
 
