@@ -3,7 +3,7 @@ name: NEU-DET
 datamodule: 'coco'
 
 dataset:
-    dir: 'D:\Code\Datasets\Images\Detection\NEU_DET\NEU_DET_COCO'
+    dir: 'G:\Datasets\Images\Detection\NEU_DET\COCO'
     train: 'train'  # directory name of training image
     train_json: 'annotations/train.json'
     val: 'val'

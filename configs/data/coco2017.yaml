@@ -1,18 +1,19 @@
 # Parameters
+name: COCO2017
 datamodule: 'coco'
 
 dataset:
-    dir: 'D:\Code\Datasets\Detection\COCO2017'
-    train: 'train'  # directory name of training image
-    train_json: 'annotations/train.json'
-    val: 'val'
-    val_json: 'annotations/val.json'
+    dir: 'F:\Code\Datasets\Images\Detection\COCO2017'
+    train: 'train2017'  # directory name of training image
+    train_json: 'annotations_trainval2017\annotations\instances_train2017.json'
+    val: 'val2017'
+    val_json: 'annotations_trainval2017\annotations\instances_val2017.json'
     test: 'test'
     test_json: 'annotations/test.json'
     train_size: [640,640]  # [224,224] [416,416] [640,640]
     val_size: [640,640]
-    train_batch_size: 8
-    val_batch_size: 8
+    train_batch_size: 2
+    val_batch_size: 2
 
 transform:
     # Train transform

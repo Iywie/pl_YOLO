@@ -1,5 +1,4 @@
 import torch.nn as nn
-from timm.models import create_model
 # backbones
 from models.backbones.darknet_csp import CSPDarkNet
 from models.backbones.mobilenext_csp import CSPMobileNext
