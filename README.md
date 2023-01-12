@@ -21,10 +21,14 @@ COCO2017
 └─val2017 
 ```
 #### Change dataset parameters
-In configs/data/coco2017.yaml   
-Change the directory, train size and batch size.
+In configs/data/coco2017.yaml, change the directory, image size and batch size.
 ```
     dir: <path to your COCO2017>
+    ...
+    train_size: [640,640]
+    val_size: [640,640]
+    train_batch_size: 32
+    val_batch_size: 32
 ```
 
 #### Run YOLOX-s
