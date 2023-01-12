@@ -2,7 +2,7 @@
 Detection on pytorch lightning.
 
 ## Step of training
-### 1. Build the model yaml and data yaml in configs.
+### 1. Build the model parameters and dataset parameters in configs.
 ### 2. Run
 ```python
   python train.py -c <path to the model yaml> -d <path to the data yaml>
