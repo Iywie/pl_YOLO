@@ -21,8 +21,8 @@ COCO2017
 └─val2017 
 ```
 #### Change dataset parameters
-In configs/data/coco2017.yaml
-| Change the directory, train size and batch size.
+In configs/data/coco2017.yaml   
+Change the directory, train size and batch size.
 ```
     dir: <path to your COCO2017>
 ```
