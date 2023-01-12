@@ -7,3 +7,13 @@ Detection on pytorch lightning.
 ```python
   python train.py -c <path to the model config> -d <path to the data config>
 ```
+
+## Example
+### COCO2017 Dataset
+COCO2017
+└───annotations_trainval2017
+|   └───annotations
+|   |   |   instances_train2017.json
+|   |   |   instances_val2017.json
+└───train2017  
+└───val2017
