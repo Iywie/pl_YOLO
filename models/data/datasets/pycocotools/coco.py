@@ -173,6 +173,24 @@ class COCO:
         ids = [cat['id'] for cat in cats]
         return ids
 
+    def getCatNames(self, catNms=[], supNms=[], catIds=[]):
+        """
+        filtering parameters. default skips that filter.
+        :param catNms (str array)  : get cats for given cat names
+        :param supNms (str array)  : get cats for given supercategory names
+        :param catIds (int array)  : get cats for given cat ids
+        :return: ids (int array)   : integer array of cat ids
+        """
+        catNms = catNms if _isArrayLike(catNms) else [catNms]
+
+        if len(catNms) == len(supNms) == len(catIds) == 0:
+            cats = self.dataset['categories']
+        else:
+            cats = self.dataset['categories']
+            cats = cats if len(catNms) == 0 else [cat for cat in cats if cat['name'] in catNms]
+        names = [cat['name'] for cat in cats]
+        return names
+
     def getImgIds(self, imgIds=[], catIds=[]):
         '''
         Get img ids that satisfy given filter conditions.

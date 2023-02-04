@@ -16,7 +16,6 @@ def main():
 
     model_cfgs = load_config(args.model)
     model = build_model(model_cfgs, data_cfgs['num_classes'])
-    lightning = LitDetection(model, model_cfgs, data_cfgs)
 
     logger = build_logger(args.logger, data_cfgs['name'], args.experiment_name, model, model_cfgs)
 
@@ -50,10 +49,18 @@ def main():
         # reload_dataloaders_every_n_epochs=10,
     )
 
-    trainer.fit(lightning, datamodule=data)
+    if not args.test:
+        lightning = LitDetection(model, model_cfgs, data_cfgs)
+        trainer.fit(lightning, datamodule=data)
+    else:
+        test_cfgs = {'visualize': args.visualize, 'test_nms': args.nms, 'test_conf': args.conf,
+                     'show_dir': args.show_dir, 'show_score_thr': args.show_score_thr}
+        lightning = LitDetection(model, model_cfgs, data_cfgs, test_cfgs)
+        trainer.test(lightning, datamodule=data,
+                     ckpt_path='F:\论文\毕业论文\实验\pl_yolo\AL6\YOLOX-l-mixup1.0-epoch=249-mAP=0.744.ckpt')
+
     # trainer.tune(lightning, datamodule=data)
     # trainer.validate(lightning, datamodule=data, ckpt_path='weights/al6/epoch=399-mAP=0.774.ckpt')
-    # trainer.test(lightning, datamodule=data)
 
 
 if __name__ == "__main__":

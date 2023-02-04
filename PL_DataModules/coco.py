@@ -10,16 +10,20 @@ from torch.utils.data.sampler import BatchSampler, RandomSampler
 class COCODataModule(pl.LightningDataModule):
     def __init__(self, cfgs):
         super().__init__()
+        self.dataset_test = None
         self.dataset_train = None
         self.dataset_val = None
         self.cd = cfgs['dataset']
         self.ct = cfgs['transform']
+        self.class_name = cfgs['classes']
         # dataloader parameters
         self.data_dir = self.cd['dir']
         self.train_dir = self.cd['train']
         self.train_json_path = self.cd['train_json']
         self.val_dir = self.cd['val']
         self.val_json_path = self.cd['val_json']
+        self.test_dir = self.cd['test']
+        self.test_json_path = self.cd['test_json']
         self.img_size_train = tuple(self.cd['train_size'])
         self.img_size_val = tuple(self.cd['val_size'])
         self.train_batch_size = self.cd['train_batch_size']
@@ -34,6 +38,9 @@ class COCODataModule(pl.LightningDataModule):
         self.translate = self.ct['translate']
         self.shear = self.ct['shear']
         self.perspective = self.ct['perspective']
+        # mixup
+        self.mixup_prob = self.ct['mixup_prob']
+        self.mixup_scale = self.ct['mixup_scale']
         # copypaste
         self.copypaste_prob = self.ct['copypaste_prob']
         self.copypaste_scale = self.ct['copypaste_scale']
@@ -64,6 +71,8 @@ class COCODataModule(pl.LightningDataModule):
             translate=self.translate,
             shear=self.shear,
             perspective=self.perspective,
+            mixup_prob=self.mixup_prob,
+            mixup_scale=self.mixup_scale,
             copypaste_prob=self.copypaste_prob,
             copypaste_scale=self.copypaste_scale,
             cutpaste_prob=self.cutpaste_prob,
@@ -92,3 +101,16 @@ class COCODataModule(pl.LightningDataModule):
         val_loader = DataLoader(self.dataset_val, batch_size=self.val_batch_size, shuffle=False,
                                 num_workers=6, pin_memory=True, persistent_workers=True)
         return val_loader
+
+    def test_dataloader(self):
+        self.dataset_test = COCODataset(
+            self.data_dir,
+            name=self.test_dir,
+            json=self.test_json_path,
+            img_size=self.img_size_val,
+            preprocess=ValTransform(legacy=False),
+            cache=False,
+        )
+        test_loader = DataLoader(self.dataset_test, batch_size=self.val_batch_size, shuffle=False,
+                                 num_workers=6, pin_memory=False, persistent_workers=False)
+        return test_loader

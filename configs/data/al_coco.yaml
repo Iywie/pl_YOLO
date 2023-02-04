@@ -3,17 +3,17 @@ name: Aluminum profile
 datamodule: coco
 
 dataset:
-    dir: '/home/chihaya/Code/AI/Dataset/Aluminum/COCO'
+    dir: 'G:\Datasets\Images\Detection\Aluminium\COCO'
     train: 'train'  # directory name of training image
     train_json: 'annotations/train.json'
     val: 'val'
     val_json: 'annotations/val.json'
-    test: 'test'
-    test_json: 'annotations/test.json'
+    test: 'val'
+    test_json: 'annotations/val.json'
     train_size: [640,640]  # [224,224] [416,416] [640,640]
     val_size: [640,640]
-    train_batch_size: 4
-    val_batch_size: 4
+    train_batch_size: 8
+    val_batch_size: 8
 
 transform:
     # Train transform
@@ -27,6 +27,9 @@ transform:
     translate: 0.1
     shear: 2.0
     perspective: 0.0
+    # mixup in mosaic (YOLOX)
+    mixup_prob: 1.0
+    mixup_scale: [0.5, 1.5]
     # CopyPaste in mosaic
     copypaste_prob: 0
     copypaste_scale: [ 0.5, 1.5 ]

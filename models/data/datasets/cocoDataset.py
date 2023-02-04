@@ -35,6 +35,7 @@ class COCODataset(Dataset):
         self.coco = COCO(os.path.join(self.data_dir, self.json_file))
         self.ids = self.coco.getImgIds()
         self.class_ids = sorted(self.coco.getCatIds())
+        self.class_names = self.coco.getCatNames()
         self.annotations = self._load_coco_annotations()
         self.gt_bboxes = self._get_gtbbox()
         self.imgs = None

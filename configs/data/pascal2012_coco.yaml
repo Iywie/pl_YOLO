@@ -1,19 +1,19 @@
 # Parameters
-name: NEU-DET
+name: COCO2017
 datamodule: 'coco'
 
 dataset:
-    dir: 'G:\Datasets\Images\Detection\NEU_DET\COCO'
+    dir: 'G:\Datasets\Images\Detection\PascalVOC2012\COCO'
     train: 'train'  # directory name of training image
     train_json: 'annotations/train.json'
     val: 'val'
     val_json: 'annotations/val.json'
     test: 'val'
     test_json: 'annotations/val.json'
-    train_size: [224,224]  # [224,224] [416,416] [640,640]
-    val_size: [224,224]
-    train_batch_size: 32
-    val_batch_size: 32
+    train_size: [640,640]  # [224,224] [416,416] [640,640]
+    val_size: [640,640]
+    train_batch_size: 2
+    val_batch_size: 2
 
 transform:
     # Train transform
@@ -28,7 +28,7 @@ transform:
     shear: 2.0
     perspective: 0.0
     # mixup in mosaic (YOLOX)
-    mixup_prob: 0
+    mixup_prob: 1.0
     mixup_scale: [ 0.5, 1.5 ]
     # CopyPaste in mosaic
     copypaste_prob: 0
@@ -38,5 +38,6 @@ transform:
     # Cutout rounding background
     cutoutR_prob: 0
 
-num_classes: 6
-classes: [crazing, inclusion, patches, pitted_surface, rolled-in_scale, scratches]
+num_classes: 20
+classes: [aeroplane, bicycle, bird, boat, bottle, bus, car, cat, chair, cow,
+          diningtable, dog, horse, motorbike, person, pottedplant, sheep, sofa, train, tvmonitor]

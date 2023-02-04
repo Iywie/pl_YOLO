@@ -27,6 +27,9 @@ transform:
     translate: 0.1
     shear: 2.0
     perspective: 0.0
+    # mixup in mosaic (YOLOX)
+    mixup_prob: 1.0
+    mixup_scale: [ 0.5, 1.5 ]
     # CopyPaste in mosaic
     copypaste_prob: 0
     copypaste_scale: [ 0.5, 1.5 ]
